@@ -93,31 +93,26 @@ impl Database {
         Ok(())
     }
 
-    pub async fn assign_tag_to_file<P: AsRef<Path>>(
+    pub async fn assign_tag_to_file_by_id(
         &self,
-        file_path: P,
+        file_id: i64,
         tag_name: &str,
     ) -> Result<(), DbError> {
-        let file_path = file_path.as_ref().to_string_lossy();
+        let exists: Option<(i64,)> = sqlx::query_as("SELECT id FROM files WHERE id = ?")
+            .bind(file_id)
+            .fetch_optional(&self.pool)
+            .await?;
 
-        let file_id: i64 = sqlx::query(
-            r#"
-            INSERT INTO files (path) VALUES (?)
-            ON CONFLICT(path) DO UPDATE SET path=excluded.path
-            RETURNING id;
-            "#,
-        )
-        .bind(&*file_path)
-        .fetch_one(&self.pool)
-        .await?
-        .get("id");
+        if exists.is_none() {
+            return Err(sqlx::Error::RowNotFound.into());
+        }
 
         let tag_id: i64 = sqlx::query(
             r#"
-            INSERT INTO tags (name) VALUES (?)
-            ON CONFLICT(name) DO UPDATE SET name=excluded.name
-            RETURNING id;
-            "#,
+        INSERT INTO tags (name) VALUES (?)
+        ON CONFLICT(name) DO UPDATE SET name = excluded.name
+        RETURNING id;
+        "#,
         )
         .bind(tag_name)
         .fetch_one(&self.pool)
@@ -126,8 +121,8 @@ impl Database {
 
         sqlx::query(
             r#"
-            INSERT OR IGNORE INTO file_tags (file_id, tag_id) VALUES (?, ?)
-            "#,
+        INSERT OR IGNORE INTO file_tags (file_id, tag_id) VALUES (?, ?)
+        "#,
         )
         .bind(file_id)
         .bind(tag_id)
@@ -206,7 +201,7 @@ impl Database {
         };
 
         let query = format!(
-          r#"
+            r#"
           SELECT f.id, f.path, GROUP_CONCAT(t2.name, ',' ORDER BY t2.name) AS all_tags
           FROM files f
           JOIN file_tags ft1 ON ft1.file_id = f.id
