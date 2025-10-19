@@ -1,5 +1,6 @@
+use crate::config::{TAGER_DB_NAME, TAGER_DIR_NAME};
 use sqlx::{Row, SqlitePool};
-use std::{path::{Path, PathBuf}};
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 use walkdir::WalkDir;
 
@@ -27,15 +28,30 @@ impl Database {
         Ok(db)
     }
 
-    pub async fn new_file<P: AsRef<Path>, R: AsRef<Path>>(
-        db_file_path: P,
-        root_dir: R,
+    pub async fn new_file<P: AsRef<Path>>(
+        root_dir: P,
+        tager_dir: Option<P>,
     ) -> Result<Self, DbError> {
-        let url = format!("sqlite://{}", db_file_path.as_ref().display());
+        let root_path = root_dir.as_ref();
+
+        let tager_path = if let Some(dir) = tager_dir {
+            dir.as_ref().to_path_buf()
+        } else {
+            root_path.join(TAGER_DIR_NAME)
+        };
+
+        let db_file_path = tager_path.join(TAGER_DB_NAME);
+
+        if let Some(parent) = db_file_path.parent() {
+            std::fs::create_dir_all(parent)
+              .map_err(|e| DbError::Sql(sqlx::Error::Io(e)))?;
+        }
+
+        let url = format!("sqlite://{}?mode=rwc", db_file_path.display());
         let pool = SqlitePool::connect(&url).await?;
         let db = Self {
             pool,
-            root_dir: root_dir.as_ref().to_path_buf(),
+            root_dir: root_path.to_path_buf(),
         };
         db.init_schema().await?;
         Ok(db)
@@ -134,6 +150,29 @@ impl Database {
             .collect())
     }
 
+    pub async fn get_untaged_files(&self) -> Result<Vec<(i64, String)>, DbError> {
+        let rows = sqlx::query(
+            r#"
+            SELECT f.id, f.path
+            FROM files f
+            LEFT JOIN file_tags ft ON f.id = ft.file_id
+            WHERE ft.file_id IS NULL
+            ORDER BY f.path;
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| {
+              let id = r.get::<i64, _>("id");
+              let path = r.get::<String, _>("path");
+              (id, path)
+            })
+            .collect())
+    }
+
     pub async fn get_files_for_tag(&self, tag_name: &str) -> Result<Vec<String>, DbError> {
         let rows = sqlx::query(
             r#"
@@ -155,48 +194,48 @@ impl Database {
     }
 
     pub async fn rebuild(&self) -> Result<usize, DbError> {
-      let mut added_count = 0;
+        let mut added_count = 0;
 
-      for entry in WalkDir::new(&self.root_dir)
-        .follow_links(false)
-        .into_iter()
-        .filter_entry(|e| {
-          if e.file_type().is_dir() {
+        for entry in WalkDir::new(&self.root_dir)
+            .follow_links(false)
+            .into_iter()
+            .filter_entry(|e| {
+                if e.file_type().is_dir() {
                     if let Some(name) = e.path().file_name() {
                         return name != ".tager";
                     }
                 }
                 true
-        })
-        .filter_map(|e| e.ok())
+            })
+            .filter_map(|e| e.ok())
         {
-          if !entry.file_type().is_file() {
-            continue;
-          }
+            if !entry.file_type().is_file() {
+                continue;
+            }
 
-          let abs_path = entry.path();
+            let abs_path = entry.path();
 
-          let rel_path = match abs_path.strip_prefix(&self.root_dir) {
-            Ok(p) => p,
-            Err(_) => continue,
-          };
+            let rel_path = match abs_path.strip_prefix(&self.root_dir) {
+                Ok(p) => p,
+                Err(_) => continue,
+            };
 
-          let rel_path = rel_path.to_string_lossy();
+            let rel_path = rel_path.to_string_lossy();
 
-          let result = sqlx::query(
-            r#"
+            let result = sqlx::query(
+                r#"
             INSERT OR IGNORE INTO files (path) VALUES (?)
             "#,
-          )
-          .bind(&*rel_path)
-          .execute(&self.pool)
-          .await?;
+            )
+            .bind(&*rel_path)
+            .execute(&self.pool)
+            .await?;
 
-          if result.rows_affected() > 0 {
-            added_count += 1;
-          }
+            if result.rows_affected() > 0 {
+                added_count += 1;
+            }
         }
 
-      Ok(added_count)
+        Ok(added_count)
     }
 }

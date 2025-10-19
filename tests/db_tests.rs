@@ -1,5 +1,4 @@
 use tager::db::Database;
-use std::path::Path;
 
 #[tokio::test]
 async fn test_assign_tag_to_file_creates_records() {
