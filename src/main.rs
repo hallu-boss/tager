@@ -1,5 +1,5 @@
 use std::{path::Path};
-use tager::db::Database;
+use tager::db::{Database, FilesOrderBy};
 
 const ROOT_DIR: &str = "/home/pawel/Desktop/test-data";
 
@@ -13,7 +13,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let count = db.rebuild().await?;
     println!("🔄 Skanowanie katalogu zakończone {count}");
 
-    let files = db.get_untaged_files().await?;
+    let files = db.get_untaged_files(Some(FilesOrderBy::Path)).await?;
 
     for (id, file) in &files {
         println!(" - {}. {}", id, file);

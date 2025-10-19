@@ -17,6 +17,18 @@ pub struct Database {
     root_dir: PathBuf,
 }
 
+pub enum FilesOrderBy {
+    Id,
+    Path,
+}
+
+#[derive(Debug, Clone)]
+pub struct FileWithTags {
+    pub id: i64,
+    pub path: String,
+    pub tags: Vec<String>,
+}
+
 impl Database {
     pub async fn new_in_memory() -> Result<Self, DbError> {
         let pool = SqlitePool::connect("sqlite::memory:").await?;
@@ -43,8 +55,7 @@ impl Database {
         let db_file_path = tager_path.join(TAGER_DB_NAME);
 
         if let Some(parent) = db_file_path.parent() {
-            std::fs::create_dir_all(parent)
-              .map_err(|e| DbError::Sql(sqlx::Error::Io(e)))?;
+            std::fs::create_dir_all(parent).map_err(|e| DbError::Sql(sqlx::Error::Io(e)))?;
         }
 
         let url = format!("sqlite://{}?mode=rwc", db_file_path.display());
@@ -60,12 +71,12 @@ impl Database {
     async fn init_schema(&self) -> Result<(), DbError> {
         let schema = r#"
         CREATE TABLE IF NOT EXISTS files (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id INTEGER PRIMARY KEY,
             path TEXT NOT NULL UNIQUE
         );
 
         CREATE TABLE IF NOT EXISTS tags (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id INTEGER PRIMARY KEY,
             name TEXT NOT NULL UNIQUE
         );
 
@@ -150,47 +161,89 @@ impl Database {
             .collect())
     }
 
-    pub async fn get_untaged_files(&self) -> Result<Vec<(i64, String)>, DbError> {
-        let rows = sqlx::query(
+    pub async fn get_untaged_files(
+        &self,
+        order_by: Option<FilesOrderBy>,
+    ) -> Result<Vec<(i64, String)>, DbError> {
+        let order_clause = match order_by {
+            Some(FilesOrderBy::Id) => "ORDER BY f.id",
+            Some(FilesOrderBy::Path) => "ORDER BY f.path",
+            None => "",
+        };
+
+        let query = format!(
             r#"
             SELECT f.id, f.path
             FROM files f
             LEFT JOIN file_tags ft ON f.id = ft.file_id
             WHERE ft.file_id IS NULL
-            ORDER BY f.path;
+            {};
             "#,
-        )
-        .fetch_all(&self.pool)
-        .await?;
+            order_clause
+        );
+
+        let rows = sqlx::query(&query).fetch_all(&self.pool).await?;
 
         Ok(rows
             .into_iter()
             .map(|r| {
-              let id = r.get::<i64, _>("id");
-              let path = r.get::<String, _>("path");
-              (id, path)
+                let id = r.get::<i64, _>("id");
+                let path = r.get::<String, _>("path");
+                (id, path)
             })
             .collect())
     }
 
-    pub async fn get_files_for_tag(&self, tag_name: &str) -> Result<Vec<String>, DbError> {
-        let rows = sqlx::query(
-            r#"
-            SELECT f.path
-            FROM files f
-            JOIN file_tags ft ON ft.file_id = f.id
-            JOIN tags t ON t.id = ft.tag_id
-            WHERE t.name = ?;
-            "#,
-        )
-        .bind(tag_name)
-        .fetch_all(&self.pool)
-        .await?;
+    pub async fn get_files_for_tag(
+        &self,
+        tag_name: &str,
+        order_by: Option<FilesOrderBy>,
+    ) -> Result<Vec<FileWithTags>, DbError> {
+        let order_clause = match order_by {
+            Some(FilesOrderBy::Id) => "ORDER BY f.id",
+            Some(FilesOrderBy::Path) => "ORDER BY f.path",
+            None => "",
+        };
 
-        Ok(rows
+        let query = format!(
+          r#"
+          SELECT f.id, f.path, GROUP_CONCAT(t2.name, ',' ORDER BY t2.name) AS all_tags
+          FROM files f
+          JOIN file_tags ft1 ON ft1.file_id = f.id
+          JOIN tags t1 ON t1.id = ft1.tag_id
+          -- ft1 + t1 filtrują pliki po wskazanym tagu
+
+          JOIN file_tags ft2 ON ft2.file_id = f.id
+          JOIN tags t2 ON t2.id = ft2.tag_id
+          -- ft2 + t2 pobierają WSZYSTKIE tagi przypisane do danego pliku
+
+          WHERE t1.name = ?
+          GROUP BY f.id, f.path
+          {};
+          "#,
+            order_clause
+        );
+        let rows = sqlx::query(&query)
+            .bind(tag_name)
+            .fetch_all(&self.pool)
+            .await?;
+
+        let files = rows
             .into_iter()
-            .map(|r| r.get::<String, _>("path"))
-            .collect())
+            .map(|r| {
+                let id = r.get::<i64, _>("id");
+                let path = r.get::<String, _>("path");
+                let all_tags_str = r.get::<Option<String>, _>("all_tags").unwrap_or_default();
+                let tags = all_tags_str
+                    .split(',')
+                    .filter(|s| !s.is_empty())
+                    .map(|s| s.to_string())
+                    .collect::<Vec<_>>();
+                FileWithTags { id, path, tags }
+            })
+            .collect();
+
+        Ok(files)
     }
 
     pub async fn rebuild(&self) -> Result<usize, DbError> {
