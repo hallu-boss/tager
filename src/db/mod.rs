@@ -1,7 +1,7 @@
 use sqlx::{Error, SqlitePool};
 
 mod queries;
-use queries::{DB_SCHEMA, INSERT_FILE, INSERT_TAG};
+use queries::*;
 
 pub struct Database {
   pool: SqlitePool
@@ -39,6 +39,48 @@ impl Database {
       .await?;
 
     Ok(result.last_insert_rowid())
+  }
+
+  async fn file_exists(&self, file_id: i64) -> Result<bool, Error> {
+    let file_exists = sqlx::query(FILE_EXISTS)
+      .bind(file_id)
+      .fetch_optional(&self.pool)
+      .await?;
+
+    if file_exists.is_none() {
+      return Ok(false);
+    }
+
+    Ok(true)
+  }
+
+  async fn tag_exists(&self, tag_id: i64) -> Result<bool, Error> {
+    let tag_exists = sqlx::query(TAG_EXISTS)
+      .bind(tag_id)
+      .fetch_optional(&self.pool)
+      .await?;
+
+    if tag_exists.is_none() {
+      return Ok(false);
+    }
+
+    Ok(true)
+  }
+
+  pub async fn assign_tag_to_file(&self, tag_id: i64, file_id: i64) -> Result<i64, Error> {
+    let tag_exists = self.tag_exists(tag_id).await.unwrap();
+    let file_exists = self.file_exists(file_id).await.unwrap();
+    if !tag_exists || !file_exists {
+      return Err(sqlx::Error::RowNotFound.into());
+    }
+
+    let res = sqlx::query(INSERT_INTO_FILE_TAGS)
+      .bind(file_id)
+      .bind(tag_id)
+      .execute(&self.pool)
+      .await?;
+
+    Ok(res.last_insert_rowid())
   }
 }
 
@@ -128,4 +170,6 @@ mod tests {
     assert_eq!(id, tag_id);
     assert_eq!(name, "test");
   }
+
+  // TODO assign... test
 }

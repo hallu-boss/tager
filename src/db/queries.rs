@@ -25,3 +25,15 @@ pub const INSERT_FILE: &str = r#"
 pub const INSERT_TAG: &str = r#"
   INSERT INTO tags (name) VALUES (?)
 "#;
+
+pub const FILE_EXISTS: &str = r#"
+  SELECT id FROM files WHERE id = ?
+"#;
+
+pub const TAG_EXISTS: &str = r#"
+  SELECT id FROM tags WHERE id = ?
+"#;
+
+pub const INSERT_INTO_FILE_TAGS: &str =  r#"
+  INSERT OR IGNORE INTO file_tags (file_id, tag_id) VALUES (?, ?)
+"#;
