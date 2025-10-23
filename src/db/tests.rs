@@ -93,4 +93,77 @@ async fn test_add_tag() {
 
     assert_eq!(id, tag_id);
     assert_eq!(name, "test");
+
+    let tag_id = db.add_tag("sea").await.unwrap();
+
+    assert!(tag_id == 2);
+
+    let row = sqlx::query("SELECT id, name FROM tags WHERE id = ?")
+        .bind(tag_id)
+        .fetch_one(&db.pool)
+        .await
+        .unwrap();
+
+    let id: i64 = row.get("id");
+    let name: String = row.get("name");
+
+    assert_eq!(id, tag_id);
+    assert_eq!(name, "sea");
+}
+
+#[tokio::test]
+async fn test_assign_tag_to_file() {
+    let db = Database::new_in_memory().await.unwrap();
+
+    let file_id = db.add_file("tmp/file.txt").await.unwrap();
+    let tag_id = db.add_tag("important").await.unwrap();
+
+    // przypisanie
+    let result = db.assign_tag_to_file(tag_id, file_id).await;
+    assert!(result.is_ok(), "assign_tag_to_file() powinno się powieść");
+
+    // weryfikacja wpisu
+    let row = sqlx::query("SELECT file_id, tag_id FROM file_tags WHERE file_id = ? AND tag_id = ?")
+        .bind(file_id)
+        .bind(tag_id)
+        .fetch_one(&db.pool)
+        .await
+        .unwrap();
+
+    let db_file_id: i64 = row.get("file_id");
+    let db_tag_id: i64 = row.get("tag_id");
+
+    assert_eq!(db_file_id, file_id);
+    assert_eq!(db_tag_id, tag_id);
+}
+
+#[tokio::test]
+async fn test_get_file_tags() {
+    let db = Database::new_in_memory().await.unwrap();
+
+    let file_id = db.add_file("tmp/file.txt").await.unwrap();
+    let tag_id = db.add_tag("important").await.unwrap();
+
+    assert!(db.assign_tag_to_file(tag_id, file_id).await.is_ok());
+
+    let tags = db.get_file_tags(file_id).await.unwrap();
+
+    assert!(tags[0] == "important")
+}
+
+#[tokio::test]
+async fn test_get_all_files() {
+    let db = Database::new_in_memory().await.unwrap();
+
+    let tag1 = String::from("important");
+    let tag2 = String::from("important2");
+
+    let file_id = db.add_file("tmp/file.txt").await.unwrap();
+    let tag_id = db.add_tag(&tag1).await.unwrap();
+    let tag_id = db.add_tag(&tag2).await.unwrap();
+
+    let files = db.get_all_files().await.unwrap();
+    assert!(files[0].path == "tmp/file.xt");
+    assert!(files[0].tags.contains(&tag1));
+    assert!(files[0].tags.contains(&tag2));
 }

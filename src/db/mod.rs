@@ -24,6 +24,14 @@ impl Database {
         Ok(db)
     }
 
+    pub async fn from_file() -> Result<Self, Error> {
+        let url = format!("sqlite://{}?mode=rwc", "/home/pawel/Desktop/tager/test.db");
+        let pool = SqlitePool::connect(&url).await?;
+        let db = Self { pool };
+        db.init_schema().await?;
+        Ok(db)
+    }
+
     async fn init_schema(&self) -> Result<(), Error> {
         sqlx::query(DB_SCHEMA).execute(&self.pool).await?;
 
@@ -103,34 +111,25 @@ impl Database {
     }
 
     pub async fn get_all_files(&self) -> Result<Vec<FileWithTags>, Error> {
-        let rows = sqlx::query(
-            r#"
-          SELECT f.id, f.path, GROUP_CONCAT(t2.name, ',' ORDER BY t2.name) AS all_tags
-          FROM files f
-          JOIN file_tags ft1 ON ft1.file_id = f.id
-          JOIN tags t1 ON t1.id = ft1.tag_id
-          JOIN file_tags ft2 ON ft2.file_id = f.id
-          JOIN tags t2 ON t2.id = ft2.tag_id
-          GROUP BY f.id, f.path
-            "#,
-        )
-        .fetch_all(&self.pool)
-        .await?;
+        let rows = sqlx::query(GET_ALL_TAGS_FOR_ALL_FILES)
+            .fetch_all(&self.pool)
+            .await?;
 
         let files = rows
             .into_iter()
             .map(|r| {
-                let id = r.get("id");
-                let path = r.get("path");
-                let all_tags = r.get::<Option<String>, _>("all_tags").unwrap_or_default();
-                let tags = all_tags
-                    .split(",")
+                let id = r.get::<i64, _>("id");
+                let path = r.get::<String, _>("path");
+                let all_tags_str = r.get::<Option<String>, _>("all_tags").unwrap_or_default();
+                let tags = all_tags_str
+                    .split(',')
                     .filter(|s| !s.is_empty())
                     .map(|s| s.to_string())
                     .collect::<Vec<_>>();
                 FileWithTags { id, path, tags }
             })
             .collect();
+
         Ok(files)
     }
 }

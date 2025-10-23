@@ -34,6 +34,21 @@ pub const TAG_EXISTS: &str = r#"
   SELECT id FROM tags WHERE id = ?
 "#;
 
-pub const INSERT_INTO_FILE_TAGS: &str =  r#"
+pub const INSERT_INTO_FILE_TAGS: &str = r#"
   INSERT OR IGNORE INTO file_tags (file_id, tag_id) VALUES (?, ?)
+"#;
+
+pub const GET_FILE_TAGS: &str = r#"
+  SELECT t.name FROM tags t
+  JOIN file_tags ft ON ft.tag_id = t.id
+  JOIN files f ON f.id = ft.file_id
+  WHERE f.id = ?;
+"#;
+
+pub const GET_ALL_TAGS_FOR_ALL_FILES: &str = r#"
+  SELECT f.id, f.path, GROUP_CONCAT(t1.name, ',' ORDER BY t1.name) AS all_tags
+  FROM files f
+  JOIN file_tags ft1 ON ft1.file_id = f.id
+  JOIN tags t1 ON t1.id = ft1.tag_id
+  GROUP BY f.id, f.path;
 "#;
