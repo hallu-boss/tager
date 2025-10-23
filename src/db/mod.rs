@@ -1,7 +1,34 @@
-use sqlx::{Error, Row, SqlitePool};
+use std::{path::Path, str::FromStr};
 
-mod queries;
-use queries::*;
+use sqlx::{sqlite::{SqliteConnectOptions, SqlitePoolOptions}, Error, Row, SqlitePool};
+
+async fn init_schema(pool: &SqlitePool) -> Result<(), Error> {
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS files (
+            id INTEGER PRIMARY KEY,
+            path TEXT NOT NULL UNIQUE
+        );"
+    ).execute(pool).await?;
+    
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS tags (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE
+        );"
+    ).execute(pool).await?;
+    
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS file_tags (
+            file_id INTEGER NOT NULL,
+            tag_id INTEGER NOT NULL,
+            PRIMARY KEY (file_id, tag_id),
+            FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE,
+            FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+        );"
+    ).execute(pool).await?;
+    
+    Ok(())
+}
 
 pub struct Database {
     pool: SqlitePool,
@@ -16,93 +43,112 @@ pub struct FileWithTags {
 
 impl Database {
     pub async fn new_in_memory() -> Result<Self, Error> {
-        let pool = SqlitePool::connect("sqlite::memory:").await?;
-
-        let db = Self { pool };
-        db.init_schema().await?;
-
-        Ok(db)
+        let options = SqliteConnectOptions::from_str("sqlite::memory:")?
+        .foreign_keys(true);
+    
+    let pool = SqlitePoolOptions::new()
+        .connect_with(options)
+        .await?;
+    
+    init_schema(&pool).await?;
+    Ok(Self { pool })
     }
 
+    // TODO: parametrize source file
     pub async fn from_file() -> Result<Self, Error> {
         let url = format!("sqlite://{}?mode=rwc", "/home/pawel/Desktop/tager/test.db");
         let pool = SqlitePool::connect(&url).await?;
+        init_schema(&pool).await?;
         let db = Self { pool };
-        db.init_schema().await?;
         Ok(db)
     }
 
-    async fn init_schema(&self) -> Result<(), Error> {
-        sqlx::query(DB_SCHEMA).execute(&self.pool).await?;
+    pub async fn add_file(&self, path: &Path) -> Result<i64, Error> {
+        let res = sqlx::query(
+            r#"
+        INSERT OR IGNORE INTO files (path) VALUES (?)
+        "#,
+        )
+        .bind(path.to_string_lossy())
+        .execute(&self.pool)
+        .await?;
 
-        Ok(())
+        if res.last_insert_rowid() != 0 {
+            Ok(res.last_insert_rowid())
+        } else {
+            // plik już istnieje, pobierz jego id
+            let id: i64 = sqlx::query("SELECT id FROM files WHERE path = ?")
+                .bind(path.to_string_lossy())
+                .fetch_one(&self.pool)
+                .await?
+                .get("id");
+            Ok(id)
+        }
     }
 
-    pub async fn add_file(&self, path: &str) -> Result<i64, Error> {
-        let result = sqlx::query(INSERT_FILE)
-            .bind(path)
+    pub async fn remove_file(&self, path: &Path) -> Result<u64, Error> {
+        let res = sqlx::query("DELETE FROM files WHERE path = ?")
+            .bind(path.to_string_lossy())
             .execute(&self.pool)
             .await?;
 
-        Ok(result.last_insert_rowid())
+        Ok(res.rows_affected())
     }
 
     pub async fn add_tag(&self, name: &str) -> Result<i64, Error> {
-        let result = sqlx::query(INSERT_TAG)
-            .bind(name)
-            .execute(&self.pool)
-            .await?;
+        let res = sqlx::query(
+            r#"
+        INSERT OR IGNORE INTO tags (name) VALUES (?)
+        "#,
+        )
+        .bind(name)
+        .execute(&self.pool)
+        .await?;
 
-        Ok(result.last_insert_rowid())
+        if res.last_insert_rowid() != 0 {
+            Ok(res.last_insert_rowid())
+        } else {
+            // tag już istnieje, pobierz jego id
+            let id: i64 = sqlx::query("SELECT id FROM tags WHERE name = ?")
+                .bind(name)
+                .fetch_one(&self.pool)
+                .await?
+                .get("id");
+            Ok(id)
+        }
     }
 
-    async fn file_exists(&self, file_id: i64) -> Result<bool, Error> {
-        let file_exists = sqlx::query(FILE_EXISTS)
-            .bind(file_id)
-            .fetch_optional(&self.pool)
-            .await?;
+    pub async fn assign_tag_to_file(&self, tag_name: &str, file_path: &Path) -> Result<(), Error> {
+        // Pobierz lub utwórz plik i tag
+        let file_id = self.add_file(file_path).await?;
+        let tag_id = self.add_tag(tag_name).await?;
 
-        if file_exists.is_none() {
-            return Ok(false);
-        }
-
-        Ok(true)
-    }
-
-    async fn tag_exists(&self, tag_id: i64) -> Result<bool, Error> {
-        let tag_exists = sqlx::query(TAG_EXISTS)
-            .bind(tag_id)
-            .fetch_optional(&self.pool)
-            .await?;
-
-        if tag_exists.is_none() {
-            return Ok(false);
-        }
-
-        Ok(true)
-    }
-
-    pub async fn assign_tag_to_file(&self, tag_id: i64, file_id: i64) -> Result<(), Error> {
-        let tag_exists = self.tag_exists(tag_id).await.unwrap();
-        let file_exists = self.file_exists(file_id).await.unwrap();
-        if !tag_exists || !file_exists {
-            return Err(sqlx::Error::RowNotFound.into());
-        }
-
-        let res = sqlx::query(INSERT_INTO_FILE_TAGS)
-            .bind(file_id)
-            .bind(tag_id)
-            .execute(&self.pool)
-            .await?;
+        // Wstaw do file_tags, jeśli nie istnieje
+        sqlx::query(
+            r#"
+            INSERT OR IGNORE INTO file_tags (file_id, tag_id) VALUES (?, ?)
+            "#,
+        )
+        .bind(file_id)
+        .bind(tag_id)
+        .execute(&self.pool)
+        .await?;
 
         Ok(())
     }
 
-    pub async fn get_file_tags(&self, file_id: i64) -> Result<Vec<String>, Error> {
-        let rows = sqlx::query(GET_FILE_TAGS)
-            .bind(file_id)
-            .fetch_all(&self.pool)
-            .await?;
+    pub async fn get_file_tags(&self, file_path: &Path) -> Result<Vec<String>, Error> {
+        let rows = sqlx::query(
+            r#"
+            SELECT t.name FROM tags t
+            JOIN file_tags ft ON ft.tag_id = t.id
+            JOIN files f ON f.id = ft.file_id
+            WHERE f.path = ?;
+            "#,
+        )
+        .bind(file_path.to_string_lossy())
+        .fetch_all(&self.pool)
+        .await?;
 
         Ok(rows
             .into_iter()
@@ -110,27 +156,23 @@ impl Database {
             .collect())
     }
 
-    pub async fn get_all_files(&self) -> Result<Vec<FileWithTags>, Error> {
-        let rows = sqlx::query(GET_ALL_TAGS_FOR_ALL_FILES)
-            .fetch_all(&self.pool)
-            .await?;
+    pub async fn get_tag_files(&self, tag_name: &str) -> Result<Vec<String>, Error> {
+        let rows = sqlx::query(
+            r#"
+            SELECT f.path FROM tags t
+            JOIN file_tags ft ON ft.tag_id = t.id
+            JOIN files f ON f.id = ft.file_id
+            WHERE t.name = ?;
+            "#,
+        )
+        .bind(tag_name)
+        .fetch_all(&self.pool)
+        .await?;
 
-        let files = rows
+        Ok(rows
             .into_iter()
-            .map(|r| {
-                let id = r.get::<i64, _>("id");
-                let path = r.get::<String, _>("path");
-                let all_tags_str = r.get::<Option<String>, _>("all_tags").unwrap_or_default();
-                let tags = all_tags_str
-                    .split(',')
-                    .filter(|s| !s.is_empty())
-                    .map(|s| s.to_string())
-                    .collect::<Vec<_>>();
-                FileWithTags { id, path, tags }
-            })
-            .collect();
-
-        Ok(files)
+            .map(|r| r.get::<String, _>("path"))
+            .collect())
     }
 }
 

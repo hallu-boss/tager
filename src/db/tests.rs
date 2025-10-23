@@ -2,46 +2,11 @@ use super::*;
 use sqlx::Row;
 
 #[tokio::test]
-async fn new_in_memory_allows_simple_query_or_skips_on_error() {
-    let db = Database::new_in_memory().await.unwrap();
-
-    let v: i64 = sqlx::query_scalar("SELECT 1")
-        .fetch_one(&db.pool)
-        .await
-        .expect("SELECT 1 should succeed");
-    assert_eq!(v, 1);
-}
-
-#[tokio::test]
-async fn test_schema_initialization() {
-    let db = Database::new_in_memory().await.unwrap();
-
-    let rows = sqlx::query("SELECT name FROM sqlite_master WHERE type='table'")
-        .fetch_all(&db.pool)
-        .await
-        .unwrap();
-
-    let table_names: Vec<String> = rows.iter().map(|r| r.get::<String, _>("name")).collect();
-
-    assert!(
-        table_names.contains(&"files".to_string()),
-        "Table 'files' not found in schema"
-    );
-    assert!(
-        table_names.contains(&"tags".to_string()),
-        "Table 'tags' not found in schema"
-    );
-    assert!(
-        table_names.contains(&"file_tags".to_string()),
-        "Table 'file_tags' not found in schema"
-    );
-}
-
-#[tokio::test]
 async fn test_add_file() {
     let db = Database::new_in_memory().await.unwrap();
+    let path = Path::new("tmp/file.txt");
 
-    let file_id = db.add_file("tmp/file.txt").await.unwrap();
+    let file_id = db.add_file(&path).await.unwrap();
 
     assert!(file_id == 1);
 
@@ -57,7 +22,8 @@ async fn test_add_file() {
     assert_eq!(id, file_id);
     assert_eq!(path, "tmp/file.txt");
 
-    let file_id = db.add_file("tmp/file.png").await.unwrap();
+    let path = Path::new("tmp/file.png");
+    let file_id = db.add_file(&path).await.unwrap();
 
     assert!(file_id == 2);
 
@@ -72,98 +38,126 @@ async fn test_add_file() {
 
     assert_eq!(id, file_id);
     assert_eq!(path, "tmp/file.png");
+
+    let path = Path::new("file.md");
+    let file_id = db.add_file(&path).await.unwrap();
+
+    assert!(file_id == 3);
+
+    let row = sqlx::query("SELECT id, path FROM files WHERE id = ?")
+        .bind(file_id)
+        .fetch_one(&db.pool)
+        .await
+        .unwrap();
+
+    let id: i64 = row.get("id");
+    let path: String = row.get("path");
+
+    assert_eq!(id, file_id);
+    assert_eq!(path, "file.md");
 }
 
 #[tokio::test]
-async fn test_add_tag() {
+async fn test_remove_file() {
     let db = Database::new_in_memory().await.unwrap();
+    let path = Path::new("tmp/file.txt");
+    let path2 = Path::new("tmp/file.png");
 
-    let tag_id = db.add_tag("test").await.unwrap();
+    db.add_file(&path).await.unwrap();
+    db.add_file(&path2).await.unwrap();
 
-    assert!(tag_id > 0);
+    let affected = db.remove_file(&path2).await.unwrap();
 
-    let row = sqlx::query("SELECT id, name FROM tags WHERE id = ?")
-        .bind(tag_id)
+    assert!(affected == 1);
+
+    let res = sqlx::query("SELECT * FROM files WHERE path = ?")
+        .bind(path2.to_string_lossy())
         .fetch_one(&db.pool)
-        .await
-        .unwrap();
+        .await;
 
-    let id: i64 = row.get("id");
-    let name: String = row.get("name");
+    assert!(res.is_err());
 
-    assert_eq!(id, tag_id);
-    assert_eq!(name, "test");
-
-    let tag_id = db.add_tag("sea").await.unwrap();
-
-    assert!(tag_id == 2);
-
-    let row = sqlx::query("SELECT id, name FROM tags WHERE id = ?")
-        .bind(tag_id)
+    let res = sqlx::query("SELECT * FROM files WHERE path = ?")
+        .bind(path.to_string_lossy())
         .fetch_one(&db.pool)
-        .await
-        .unwrap();
+        .await;
 
-    let id: i64 = row.get("id");
-    let name: String = row.get("name");
+    assert!(res.is_ok())
 
-    assert_eq!(id, tag_id);
-    assert_eq!(name, "sea");
 }
 
 #[tokio::test]
 async fn test_assign_tag_to_file() {
     let db = Database::new_in_memory().await.unwrap();
+    let path = Path::new("tmp/file.txt");
 
-    let file_id = db.add_file("tmp/file.txt").await.unwrap();
-    let tag_id = db.add_tag("important").await.unwrap();
+    db.add_file(&path).await.unwrap();
 
-    // przypisanie
-    let result = db.assign_tag_to_file(tag_id, file_id).await;
-    assert!(result.is_ok(), "assign_tag_to_file() powinno się powieść");
+    let res = db.assign_tag_to_file("tag", &path).await;
+    assert!(res.is_ok());
 
-    // weryfikacja wpisu
-    let row = sqlx::query("SELECT file_id, tag_id FROM file_tags WHERE file_id = ? AND tag_id = ?")
-        .bind(file_id)
-        .bind(tag_id)
+    let res = sqlx::query("SELECT * FROM file_tags WHERE file_id = 1 AND tag_id = 1")
         .fetch_one(&db.pool)
-        .await
-        .unwrap();
+        .await;
 
-    let db_file_id: i64 = row.get("file_id");
-    let db_tag_id: i64 = row.get("tag_id");
-
-    assert_eq!(db_file_id, file_id);
-    assert_eq!(db_tag_id, tag_id);
+    assert!(res.is_ok())
 }
 
 #[tokio::test]
 async fn test_get_file_tags() {
     let db = Database::new_in_memory().await.unwrap();
+    let path = Path::new("tmp/file.txt");
 
-    let file_id = db.add_file("tmp/file.txt").await.unwrap();
-    let tag_id = db.add_tag("important").await.unwrap();
+    db.add_file(&path).await.unwrap();
 
-    assert!(db.assign_tag_to_file(tag_id, file_id).await.is_ok());
+    db.assign_tag_to_file("tag1", &path).await.unwrap();
+    db.assign_tag_to_file("tag2", &path).await.unwrap();
+    db.assign_tag_to_file("tag3", &path).await.unwrap();
 
-    let tags = db.get_file_tags(file_id).await.unwrap();
+    let tags = db.get_file_tags(&path).await.unwrap();
 
-    assert!(tags[0] == "important")
+    assert!(tags.iter().any(|t| t == "tag1"));
+    assert!(tags.iter().any(|t| t == "tag2"));
+    assert!(tags.iter().any(|t| t == "tag3"));
 }
 
 #[tokio::test]
-async fn test_get_all_files() {
+async fn test_get_tag_files() {
+    // Utwórz bazę w pamięci z FK włączonymi
     let db = Database::new_in_memory().await.unwrap();
 
-    let tag1 = String::from("important");
-    let tag2 = String::from("important2");
+    // Zdefiniuj pliki w "tmp/"
+    let path1 = Path::new("tmp/file.txt");
+    let path2 = Path::new("tmp/report.xls");
+    let path3 = Path::new("tmp/file.png");
+    let path4 = Path::new("tmp/image.png");
 
-    let file_id = db.add_file("tmp/file.txt").await.unwrap();
-    let tag_id = db.add_tag(&tag1).await.unwrap();
-    let tag_id = db.add_tag(&tag2).await.unwrap();
+    // Dodaj pliki do bazy
+    let id1 = db.add_file(&path1).await.unwrap();
+    let id2 = db.add_file(&path2).await.unwrap();
+    let id3 = db.add_file(&path3).await.unwrap();
+    let id4 = db.add_file(&path4).await.unwrap();
 
-    let files = db.get_all_files().await.unwrap();
-    assert!(files[0].path == "tmp/file.xt");
-    assert!(files[0].tags.contains(&tag1));
-    assert!(files[0].tags.contains(&tag2));
+    assert_eq!(id1, 1);
+    assert_eq!(id2, 2);
+    assert_eq!(id3, 3);
+    assert_eq!(id4, 4);
+
+    // Przypisz jeden tag do wszystkich plików
+    db.assign_tag_to_file("tag1", &path1).await.unwrap();
+    db.assign_tag_to_file("tag1", &path2).await.unwrap();
+    db.assign_tag_to_file("tag1", &path3).await.unwrap();
+    db.assign_tag_to_file("tag1", &path4).await.unwrap();
+
+    // Pobierz pliki dla tagu "tag1"
+    let files = db.get_tag_files("tag1").await.unwrap();
+
+    // Sprawdź, że wszystkie pliki są w wyniku
+    assert!(files.iter().any(|t| t == "tmp/file.txt"));
+    assert!(files.iter().any(|t| t == "tmp/report.xls"));
+    assert!(files.iter().any(|t| t == "tmp/file.png"));
+    assert!(files.iter().any(|t| t == "tmp/image.png"));
+
+    // Dodatkowo sprawdź, że liczba plików zgadza się z ilością wstawionych
+    assert_eq!(files.len(), 4);
 }

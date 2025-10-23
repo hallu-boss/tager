@@ -1,21 +1,26 @@
+use std::{fs, path::{Path, PathBuf}};
+
+use crate::db::Database;
 
 mod db;
-use db::Database;
 
 #[tokio::main]
 async fn main() {
-    let db = Database::from_file().await.unwrap();
+    let db = Database::new_in_memory().await.unwrap();
+    let path1 = Path::new("tmp/file.txt");
+    let path2 = Path::new("report.xls");
+    let path3 = Path::new("tmp/file.png");
 
-    let tag1 = String::from("important");
-    let tag2 = String::from("important2");
+    let id1 = db.add_file(&path1).await.unwrap();
+    let id2 = db.add_file(&path2).await.unwrap();
+    let id3 = db.add_file(&path3).await.unwrap();
 
-    let file_id = db.add_file("tmp/file.txt").await.unwrap();
-    let tag_id1 = db.add_tag(&tag1).await.unwrap();
-    let tag_id2 = db.add_tag(&tag2).await.unwrap();
+    db.assign_tag_to_file("tag1", &path1).await.unwrap();
+    db.assign_tag_to_file("tag1", &path3).await.unwrap();
+    db.assign_tag_to_file("tag1", &path2).await.unwrap();
 
-    db.assign_tag_to_file( tag_id1, file_id).await;
-    db.assign_tag_to_file( tag_id2, file_id).await;
+    let files = db.get_tag_files("tag1").await.unwrap();
 
-    let files = db.get_all_files().await.unwrap();
     println!("{:?}", files);
+
 }

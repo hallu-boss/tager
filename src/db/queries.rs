@@ -1,4 +1,6 @@
-pub const DB_SCHEMA: &str = r#"
+use sqlx::{Error, SqlitePool};
+
+const DB_SCHEMA: &str = r#"
   CREATE TABLE IF NOT EXISTS files (
     id INTEGER PRIMARY KEY,
     path TEXT NOT NULL UNIQUE
@@ -17,6 +19,11 @@ pub const DB_SCHEMA: &str = r#"
     FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
   );
 "#;
+
+pub async fn init_schema(pool: &SqlitePool) -> Result<(), Error> {
+  sqlx::query(DB_SCHEMA).execute(pool).await?;
+  Ok(())
+}
 
 pub const INSERT_FILE: &str = r#"
   INSERT INTO files (path) VALUES (?)
