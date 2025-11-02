@@ -39,6 +39,15 @@ enum Commands {
         /// Tag name to add
         tag: String,
     },
+
+    /// Rename tag
+    RenameTag {
+        // Current tag name
+        old_name: String,
+
+        /// New tag name
+        new_name: String,
+    }
 }
 
 impl Cli {
@@ -53,6 +62,9 @@ impl Cli {
             }
             Commands::AddTag { file, tag } => {
                 self.add_tag_command(file, tag).await?;
+            }
+            Commands::RenameTag { old_name, new_name } => {
+                self.rename_tag_command(old_name, new_name).await?;
             }
         }
         Ok(())
@@ -109,6 +121,25 @@ impl Cli {
         db.assign_tag_to_file_by_id(file_id, tag).await?;
         
         println!("✓ Tag '{}' dodany do pliku '{}'", tag, file_path);
+        
+        Ok(())
+    }
+
+    /// Rename a tag globally
+    async fn rename_tag_command(
+        &self,
+        old_name: &str,
+        new_name: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let (_manager, db) = self.init_manager_and_db().await?;
+        
+        db.rename_tag(old_name, new_name).await
+            .map_err(|_| {
+                format!("Nie można zmienić nazwy tagu: '{}' nie istnieje lub '{}' już istnieje", 
+                    old_name, new_name)
+            })?;
+        
+        println!("✓ Tag '{}' zmieniony na '{}'", old_name, new_name);
         
         Ok(())
     }
@@ -223,4 +254,6 @@ impl Cli {
             None => Err(format!("Plik '{}' nie został znaleziony w bazie danych", file_path).into()),
         }
     }
+
+
 }

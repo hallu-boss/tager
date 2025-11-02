@@ -255,6 +255,42 @@ impl Database {
         Ok(files)
     }
 
+     /// Rename a tag globally (affects all files with this tag).
+    pub async fn rename_tag(
+        &self,
+        old_name: &str,
+        new_name: &str,
+    ) -> Result<(), DbError> {
+        // Check if old tag exists
+        let tag_id: Option<i64> = sqlx::query_scalar("SELECT id FROM tags WHERE name = ?")
+            .bind(old_name)
+            .fetch_optional(&self.pool)
+            .await?;
+        
+        let tag_id = tag_id.ok_or_else(|| {
+            sqlx::Error::RowNotFound
+        })?;
+        
+        // Check if new name already exists
+        let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM tags WHERE name = ?")
+            .bind(new_name)
+            .fetch_optional(&self.pool)
+            .await?;
+        
+        if exists.is_some() {
+            return Err(sqlx::Error::RowNotFound.into());
+        }
+        
+        // Update tag name
+        sqlx::query("UPDATE tags SET name = ? WHERE id = ?")
+            .bind(new_name)
+            .bind(tag_id)
+            .execute(&self.pool)
+            .await?;
+        
+        Ok(())
+    }
+
     /// Get the connection pool (for advanced operations).
     pub fn pool(&self) -> &SqlitePool {
         &self.pool
