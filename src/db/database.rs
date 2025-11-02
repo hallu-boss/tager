@@ -291,6 +291,46 @@ impl Database {
         Ok(())
     }
 
+    /// Remove a tag from a file by file ID and tag name.
+    pub async fn remove_tag_from_file_by_id(
+        &self,
+        file_id: i64,
+        tag_name: &str,
+    ) -> Result<(), DbError> {
+        let tag_id: Option<i64> = sqlx::query_scalar("SELECT id FROM tags WHERE name = ?")
+            .bind(tag_name)
+            .fetch_optional(&self.pool)
+            .await?;
+        
+        let tag_id = tag_id.ok_or_else(|| {
+            sqlx::Error::RowNotFound
+        })?;
+
+        let result = sqlx::query(
+            "DELETE FROM file_tags WHERE file_id = ? AND tag_id = ?"
+        )
+        .bind(file_id)
+        .bind(tag_id)
+        .execute(&self.pool)
+        .await?;
+        
+        if result.rows_affected() == 0 {
+            return Err(sqlx::Error::RowNotFound.into());
+        }
+        
+        Ok(())
+    }
+
+    /// Get file ID by path.
+    pub async fn get_file_id_by_path(&self, file_path: &str) -> Result<i64, DbError> {
+        let file_id: Option<i64> = sqlx::query_scalar("SELECT id FROM files WHERE path = ?")
+            .bind(file_path)
+            .fetch_optional(&self.pool)
+            .await?;
+        
+        file_id.ok_or_else(|| sqlx::Error::RowNotFound.into())
+    }
+
     /// Get the connection pool (for advanced operations).
     pub fn pool(&self) -> &SqlitePool {
         &self.pool

@@ -47,7 +47,16 @@ enum Commands {
 
         /// New tag name
         new_name: String,
-    }
+    },
+
+    /// Remove a tag from a file
+    RemoveTag {
+        /// Path to the file (relative to root)
+        file: String,
+        
+        /// Tag name to remove
+        tag: String,
+    },
 }
 
 impl Cli {
@@ -65,6 +74,9 @@ impl Cli {
             }
             Commands::RenameTag { old_name, new_name } => {
                 self.rename_tag_command(old_name, new_name).await?;
+            }
+            Commands::RemoveTag { file, tag } => {
+                self.remove_tag_command(file, tag).await?;
             }
         }
         Ok(())
@@ -140,6 +152,27 @@ impl Cli {
             })?;
         
         println!("✓ Tag '{}' zmieniony na '{}'", old_name, new_name);
+        
+        Ok(())
+    }
+
+    /// Remove a tag from a file
+    async fn remove_tag_command(
+        &self,
+        file_path: &str,
+        tag: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let (_manager, db) = self.init_manager_and_db().await?;
+        
+        // Find file by path
+        let file_id = db.get_file_id_by_path(file_path).await
+            .map_err(|_| format!("Plik '{}' nie został znaleziony w bazie danych", file_path))?;
+        
+        // Remove tag from file
+        db.remove_tag_from_file_by_id(file_id, tag).await
+            .map_err(|_| format!("Tag '{}' nie był przypisany do pliku '{}'", tag, file_path))?;
+        
+        println!("✓ Tag '{}' usunięty z pliku '{}'", tag, file_path);
         
         Ok(())
     }
