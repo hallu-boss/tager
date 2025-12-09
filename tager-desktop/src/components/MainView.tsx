@@ -11,11 +11,7 @@ import {
   Alert,
   Paper,
 } from "@mui/material";
-import {
-  Refresh as RefreshIcon,
-  Add as AddIcon,
-  FilterList as FilterListIcon,
-} from '@mui/icons-material';
+import { FilterList as FilterListIcon } from "@mui/icons-material";
 import FileCard from "./FileCard";
 import type { FileItem } from "../types";
 
@@ -29,17 +25,18 @@ const mockFilesData: FileItem[] = [
     tags: ["finanse", "kwartalny", "ważne"],
     size: 2457600,
     modified: "2024-01-15",
-    type: "document"
+    type: "document",
   },
   {
     id: 2,
     name: "wakacje_2023.jpg",
     path: "/photos/wakacje_2023.jpg",
-    thumbnail: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=300&h=200&fit=crop",
+    thumbnail:
+      "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=300&h=200&fit=crop",
     tags: ["wakacje", "rodzina", "lato"],
     size: 4194304,
     modified: "2023-08-20",
-    type: "image"
+    type: "image",
   },
   {
     id: 3,
@@ -49,7 +46,7 @@ const mockFilesData: FileItem[] = [
     tags: ["praca", "prezentacja", "ważne"],
     size: 10485760,
     modified: "2024-01-10",
-    type: "video"
+    type: "video",
   },
   {
     id: 4,
@@ -58,7 +55,7 @@ const mockFilesData: FileItem[] = [
     tags: ["praca", "kontrakt", "prawne"],
     size: 512000,
     modified: "2024-01-12",
-    type: "document"
+    type: "document",
   },
   {
     id: 5,
@@ -68,7 +65,7 @@ const mockFilesData: FileItem[] = [
     tags: ["design", "branding", "ważne"],
     size: 102400,
     modified: "2024-01-05",
-    type: "image"
+    type: "image",
   },
   {
     id: 6,
@@ -77,17 +74,18 @@ const mockFilesData: FileItem[] = [
     tags: ["notatki", "tymczasowe"],
     size: 10240,
     modified: "2024-01-14",
-    type: "other"
+    type: "other",
   },
   {
     id: 7,
     name: "zdjecie_profilowe.jpg",
     path: "/photos/zdjecie_profilowe.jpg",
-    thumbnail: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=300&h=200&fit=crop",
+    thumbnail:
+      "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=300&h=200&fit=crop",
     tags: ["profil", "osobiste"],
     size: 2097152,
     modified: "2024-01-08",
-    type: "image"
+    type: "image",
   },
   {
     id: 8,
@@ -97,7 +95,7 @@ const mockFilesData: FileItem[] = [
     tags: ["dokumentacja", "techniczne"],
     size: 1572864,
     modified: "2024-01-03",
-    type: "document"
+    type: "document",
   },
 ];
 
@@ -108,40 +106,28 @@ interface MainViewProps {
 export default function MainView({ directoryPath }: MainViewProps) {
   const [query, setQuery] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [files, setFiles] = useState<FileItem[]>([]);
   const [allTags, setAllTags] = useState<string[]>([]);
 
-  // Symulacja ładowania plików
   useEffect(() => {
-    setIsLoading(true);
-    // Symulacja opóźnienia ładowania
     const timer = setTimeout(() => {
       setFiles(mockFilesData);
-      // Zbierz wszystkie unikalne tagi z plików
+
       const tags = Array.from(
-        new Set(mockFilesData.flatMap(file => file.tags))
+        new Set(mockFilesData.flatMap((file) => file.tags))
       );
       setAllTags(tags);
+
       setIsLoading(false);
     }, 500);
 
     return () => clearTimeout(timer);
   }, []);
 
-  const handleRefresh = () => {
-    setIsLoading(true);
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 300);
-    return () => clearTimeout(timer);
-  };
-
   const handleTagClick = (tag: string) => {
-    setSelectedTags(prev =>
-      prev.includes(tag)
-        ? prev.filter(t => t !== tag)
-        : [...prev, tag]
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
     );
   };
 
@@ -150,47 +136,51 @@ export default function MainView({ directoryPath }: MainViewProps) {
     console.log("Dodaj tag do pliku:", fileId);
   };
 
-  const filteredFiles = files.filter(file => {
-    const matchesSearch = file.name.toLowerCase().includes(query.toLowerCase()) ||
-      file.tags.some(tag => tag.toLowerCase().includes(query.toLowerCase()));
-    
-    const matchesTags = selectedTags.length === 0 ||
-      selectedTags.every(tag => file.tags.includes(tag));
-    
+  const filteredFiles = files.filter((file) => {
+    const matchesSearch =
+      file.name.toLowerCase().includes(query.toLowerCase()) ||
+      file.tags.some((tag) => tag.toLowerCase().includes(query.toLowerCase()));
+
+    const matchesTags =
+      selectedTags.length === 0 ||
+      selectedTags.every((tag) => file.tags.includes(tag));
+
     return matchesSearch && matchesTags;
   });
 
   const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 B';
+    if (bytes === 0) return "0 B";
     const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const sizes = ["B", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
       {/* Nagłówek z informacjami o katalogu */}
-      <Paper elevation={0} sx={{ p: 2, bgcolor: 'background.default' }}>
+      <Paper elevation={0} sx={{ p: 2, bgcolor: "background.default" }}>
         <Typography variant="h6" gutterBottom>
-          Katalog: {directoryPath.split('/').pop()}
+          Katalog: {directoryPath.split("/").pop()}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           Pełna ścieżka: {directoryPath}
         </Typography>
         <Stack direction="row" spacing={1}>
-          <Chip 
+          <Chip
             label={`${files.length} plików`}
             size="small"
             variant="outlined"
           />
-          <Chip 
+          <Chip
             label={`${allTags.length} tagów`}
             size="small"
             variant="outlined"
           />
-          <Chip 
-            label={`${formatFileSize(files.reduce((acc, file) => acc + file.size, 0))}`}
+          <Chip
+            label={`${formatFileSize(
+              files.reduce((acc, file) => acc + file.size, 0)
+            )}`}
             size="small"
             variant="outlined"
           />
@@ -198,7 +188,7 @@ export default function MainView({ directoryPath }: MainViewProps) {
       </Paper>
 
       {/* Pasek wyszukiwania i filtrów */}
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
         <TextField
           label="Wyszukaj pliki lub tagi"
           variant="outlined"
@@ -207,13 +197,20 @@ export default function MainView({ directoryPath }: MainViewProps) {
           fullWidth
         />
 
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 2,
+            flexWrap: "wrap",
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <FilterListIcon fontSize="small" />
             <Typography variant="body2">Filtry tagów:</Typography>
           </Box>
-          
-          {allTags.map(tag => (
+
+          {allTags.map((tag) => (
             <Chip
               key={tag}
               label={tag}
@@ -224,12 +221,12 @@ export default function MainView({ directoryPath }: MainViewProps) {
               size="small"
             />
           ))}
-          
+
           {selectedTags.length > 0 && (
             <Button
               size="small"
               onClick={() => setSelectedTags([])}
-              sx={{ ml: 'auto' }}
+              sx={{ ml: "auto" }}
             >
               Wyczyść filtry
             </Button>
@@ -237,28 +234,9 @@ export default function MainView({ directoryPath }: MainViewProps) {
         </Box>
       </Box>
 
-      {/* Przyciski akcji */}
-      <Box sx={{ display: 'flex', gap: 1 }}>
-        <Button
-          variant="outlined"
-          startIcon={<RefreshIcon />}
-          onClick={handleRefresh}
-          disabled={isLoading}
-        >
-          Odśwież
-        </Button>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => console.log("Dodaj nowy tag")}
-        >
-          Dodaj nowy tag
-        </Button>
-      </Box>
-
       {/* Komunikat ładowania */}
       {isLoading && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+        <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
           <CircularProgress />
         </Box>
       )}
@@ -266,7 +244,7 @@ export default function MainView({ directoryPath }: MainViewProps) {
       {/* Komunikat o braku wyników */}
       {!isLoading && filteredFiles.length === 0 && (
         <Alert severity="info">
-          {query || selectedTags.length > 0 
+          {query || selectedTags.length > 0
             ? "Nie znaleziono plików spełniających kryteria wyszukiwania."
             : "Brak plików w katalogu. Dodaj pliki lub wybierz inny katalog."}
         </Alert>
@@ -279,9 +257,9 @@ export default function MainView({ directoryPath }: MainViewProps) {
             Znaleziono {filteredFiles.length} plików
           </Typography>
           <Grid container spacing={2}>
-            {filteredFiles.map(file => (
-              <Grid size={5}key={file.id}>
-                <FileCard 
+            {filteredFiles.map((file) => (
+              <Grid size={5} key={file.id}>
+                <FileCard
                   name={file.name}
                   thumbnail={file.thumbnail}
                   tags={file.tags}

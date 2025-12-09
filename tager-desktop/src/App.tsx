@@ -6,20 +6,16 @@ import {
   Toolbar,
   Typography,
   IconButton,
-  List,
-  ListItemIcon,
-  ListItemText,
   Divider,
   Container,
   Chip,
-  ListItemButton,
+  Stack,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
   Folder as FolderIcon,
-  Search as SearchIcon,
+  InsertDriveFile as InsertDriveFileIcon,
   Tag as TagIcon,
-  Settings as SettingsIcon,
   Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import MainView from './components/MainView';
@@ -49,47 +45,24 @@ function App() {
         </Box>
       </Box>
       <Divider />
-      <List>
-        <ListItemButton>
-          <ListItemIcon>
-            <SearchIcon />
-          </ListItemIcon>
-          <ListItemText primary="Wyszukiwanie" />
-        </ListItemButton>
-        <ListItemButton>
-          <ListItemIcon>
-            <TagIcon />
-          </ListItemIcon>
-          <ListItemText primary="Zarządzanie tagami" />
-          <Chip label="24" size="small" />
-        </ListItemButton>
-        <ListItemButton>
-          <ListItemIcon>
-            <SettingsIcon />
-          </ListItemIcon>
-          <ListItemText primary="Ustawienia" />
-        </ListItemButton>
-      </List>
-      <Divider />
       <Box sx={{ p: 2 }}>
         <Typography variant="caption" color="text.secondary">
           Statystyki
         </Typography>
-        <Box sx={{ mt: 1 }}>
+        <Stack direction="row" spacing={1}>
           <Chip 
-            icon={<TagIcon />} 
+            icon={<InsertDriveFileIcon />} 
             label="42 pliki" 
             variant="outlined" 
             size="small" 
-            sx={{ mr: 1, mb: 1 }}
           />
           <Chip 
             icon={<TagIcon />} 
             label="15 tagów" 
             variant="outlined" 
-            size="small"
+            size="small" 
           />
-        </Box>
+        </Stack>
       </Box>
     </div>
   );
@@ -114,7 +87,7 @@ function App() {
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            Tag Manager
+            Tager
           </Typography>
           <IconButton color="inherit">
             <RefreshIcon />
