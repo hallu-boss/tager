@@ -1,4 +1,7 @@
 /target
+/node_modules
+/gen/schemas
+
 
 
 # Added by cargo
