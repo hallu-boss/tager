@@ -14,6 +14,7 @@ import {
 import { FilterList as FilterListIcon } from "@mui/icons-material";
 import FileCard from "./FileCard";
 import type { FileItem } from "../types";
+import { readDir } from "@tauri-apps/plugin-fs";
 
 // Symulowane dane z różnych typów plików
 const mockFilesData: FileItem[] = [
@@ -111,6 +112,11 @@ export default function MainView({ directoryPath }: MainViewProps) {
   const [allTags, setAllTags] = useState<string[]>([]);
 
   useEffect(() => {
+    async function getFiles() {
+      const entries = await readDir("/home/hallu/Documents");
+      console.log(entries);
+    }
+    getFiles()
     const timer = setTimeout(() => {
       setFiles(mockFilesData);
 

@@ -33,31 +33,5 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
-  },
-  "plugins": {
-    "fs": {
-      "allowAppData": true,
-      "allowAppLocalData": true,
-      "allowAppCache": true,
-      "allowAppLog": true,
-      "allowTemp": true,
-      "allowDesktop": true,
-      "allowDocuments": true,
-      "allowDownloads": true,
-      "allowMusic": true,
-      "allowPictures": true,
-      "allowVideos": true,
-      "allowHome": true,
-      "allowResource": true,
-      "allowPublic": true,
-      "allowAll": true
-    },
-    "dialog": {
-      "allowOpen": true,
-      "allowSave": true,
-      "allowMessage": true,
-      "allowAsk": true,
-      "allowConfirm": true
-    }
   }
 }
