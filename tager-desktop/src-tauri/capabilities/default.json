@@ -10,7 +10,7 @@
     "fs:default",
         {
       "identifier": "fs:allow-read-dir",
-      "allow": ["$HOME/Documents"]
+      "allow": ["**"]
     }
   ]
 }
