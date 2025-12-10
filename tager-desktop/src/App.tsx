@@ -7,7 +7,6 @@ import {
   Typography,
   IconButton,
   Divider,
-  Container,
   Chip,
   Stack,
 } from '@mui/material';
@@ -68,7 +67,7 @@ function App() {
   );
 
   return (
-    <Box sx={{ display: 'flex' }}>
+    <Box sx={{ display: 'flex', height: '100vh', width: '100vw' }}>
       <AppBar
         position="fixed"
         sx={{
@@ -134,9 +133,17 @@ function App() {
         }}
       >
         <Toolbar /> {/* Spacing for AppBar */}
-        <Container maxWidth="xl" sx={{ mt: 2 }}>
+        <Box
+          sx={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'auto',
+            p: 2,
+          }}
+        >
           <MainView directoryPath={directoryPath} />
-        </Container>
+        </Box>
       </Box>
     </Box>
   );

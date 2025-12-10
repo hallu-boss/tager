@@ -13,92 +13,8 @@ import {
 } from "@mui/material";
 import { FilterList as FilterListIcon } from "@mui/icons-material";
 import FileCard from "./FileCard";
-import type { FileItem } from "../types";
-import { readDir } from "@tauri-apps/plugin-fs";
-
-// Symulowane dane z różnych typów plików
-const mockFilesData: FileItem[] = [
-  {
-    id: 1,
-    name: "raport_q1.pdf",
-    path: "/documents/raport_q1.pdf",
-    thumbnail: "https://via.placeholder.com/300x200/FF6B6B/FFFFFF?text=PDF",
-    tags: ["finanse", "kwartalny", "ważne"],
-    size: 2457600,
-    modified: "2024-01-15",
-    type: "document",
-  },
-  {
-    id: 2,
-    name: "wakacje_2023.jpg",
-    path: "/photos/wakacje_2023.jpg",
-    thumbnail:
-      "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=300&h=200&fit=crop",
-    tags: ["wakacje", "rodzina", "lato"],
-    size: 4194304,
-    modified: "2023-08-20",
-    type: "image",
-  },
-  {
-    id: 3,
-    name: "prezentacja.mp4",
-    path: "/videos/prezentacja.mp4",
-    thumbnail: "https://via.placeholder.com/300x200/4ECDC4/FFFFFF?text=VIDEO",
-    tags: ["praca", "prezentacja", "ważne"],
-    size: 10485760,
-    modified: "2024-01-10",
-    type: "video",
-  },
-  {
-    id: 4,
-    name: "umowa.docx",
-    path: "/documents/umowa.docx",
-    tags: ["praca", "kontrakt", "prawne"],
-    size: 512000,
-    modified: "2024-01-12",
-    type: "document",
-  },
-  {
-    id: 5,
-    name: "logo.png",
-    path: "/design/logo.png",
-    thumbnail: "https://via.placeholder.com/300x200/45B7D1/FFFFFF?text=LOGO",
-    tags: ["design", "branding", "ważne"],
-    size: 102400,
-    modified: "2024-01-05",
-    type: "image",
-  },
-  {
-    id: 6,
-    name: "notatki.txt",
-    path: "/notes/notatki.txt",
-    tags: ["notatki", "tymczasowe"],
-    size: 10240,
-    modified: "2024-01-14",
-    type: "other",
-  },
-  {
-    id: 7,
-    name: "zdjecie_profilowe.jpg",
-    path: "/photos/zdjecie_profilowe.jpg",
-    thumbnail:
-      "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=300&h=200&fit=crop",
-    tags: ["profil", "osobiste"],
-    size: 2097152,
-    modified: "2024-01-08",
-    type: "image",
-  },
-  {
-    id: 8,
-    name: "instrukcja.pdf",
-    path: "/documents/instrukcja.pdf",
-    thumbnail: "https://via.placeholder.com/300x200/96CEB4/FFFFFF?text=INSTR",
-    tags: ["dokumentacja", "techniczne"],
-    size: 1572864,
-    modified: "2024-01-03",
-    type: "document",
-  },
-];
+import type { EntryType, FileInfo, FileItem } from "../types";
+import { invoke } from "@tauri-apps/api/core";
 
 interface MainViewProps {
   directoryPath: string;
@@ -107,29 +23,67 @@ interface MainViewProps {
 export default function MainView({ directoryPath }: MainViewProps) {
   const [query, setQuery] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [files, setFiles] = useState<FileItem[]>([]);
   const [allTags, setAllTags] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  async function loadFiles() {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      console.log("ładuję pliki z be");
+
+      const fileInfos: FileInfo[] = await invoke("read_directory_with_metadata", {
+        path: directoryPath
+      })
+
+      console.log(fileInfos)
+
+      const fileItems: FileItem[] = fileInfos.map((info, index) => {
+
+        let type: EntryType = "other";
+        if (info.is_dir) {
+          type = "directory";
+        } else if (info.extension) {
+          const ext = info.extension.toLowerCase();
+          if (["jpg", "jpeg", "png", "gif", "bmp", "webp"].includes(ext)) {
+            type = "image";
+          } else if (["pdf", "docx", "doc", "txt", "rtf"].includes(ext)) {
+            type = "document";
+          } else if (["mp4", "avi", "mov", "mkv", "wmv"].includes(ext)) {
+            type = "video";
+          }
+        }
+
+        return {
+          id: index,
+          name: info.name,
+          path: info.path,
+          thumbnail: undefined,
+          tags: [],
+          size: info.size,
+          modified: new Date(info.modified * 1000).toISOString(),
+          type,
+          isDir: info.is_dir,
+        }
+      })
+
+      setFiles(fileItems)
+      setAllTags([]);
+    } catch (err) {
+      const errMsg = `Błąd przy pobieraniu plików ${err}`
+      console.error(errMsg)
+      setError(errMsg)
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   useEffect(() => {
-    async function getFiles() {
-      const entries = await readDir("/home/hallu/Documents");
-      console.log(entries);
-    }
-    getFiles()
-    const timer = setTimeout(() => {
-      setFiles(mockFilesData);
-
-      const tags = Array.from(
-        new Set(mockFilesData.flatMap((file) => file.tags))
-      );
-      setAllTags(tags);
-
-      setIsLoading(false);
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, []);
+    loadFiles();
+  }, [directoryPath])
 
   const handleTagClick = (tag: string) => {
     setSelectedTags((prev) =>
@@ -163,7 +117,7 @@ export default function MainView({ directoryPath }: MainViewProps) {
   };
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 3, width: "100%", height: "100%" }}>
       {/* Nagłówek z informacjami o katalogu */}
       <Paper elevation={0} sx={{ p: 2, bgcolor: "background.default" }}>
         <Typography variant="h6" gutterBottom>
@@ -264,14 +218,21 @@ export default function MainView({ directoryPath }: MainViewProps) {
           </Typography>
           <Grid container spacing={2}>
             {filteredFiles.map((file) => (
-              <Grid size={5} key={file.id}>
+              <Grid 
+                key={file.id}
+                size={{ xs: 12, md: "auto"}}
+                sx={{
+                  minWidth: "250px"
+                }}
+              >
                 <FileCard
                   name={file.name}
-                  thumbnail={file.thumbnail}
+                  path={file.path}
                   tags={file.tags}
                   onAddTag={() => handleAddTag(file.id)}
                   size={formatFileSize(file.size)}
                   modified={file.modified}
+                  type={file.type}
                 />
               </Grid>
             ))}

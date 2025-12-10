@@ -1,3 +1,12 @@
+export interface FileInfo {
+  name: string;
+  path: string;
+  is_dir: boolean;
+  size: number;
+  modified: number;
+  extension?: string;
+}
+
 export interface FileItem {
   id: number;
   name: string;
@@ -6,8 +15,10 @@ export interface FileItem {
   tags: string[];
   size: number;
   modified: string;
-  type: 'image' | 'document' | 'video' | 'other';
+  type: EntryType;
 }
+
+export type EntryType = 'image' | 'document' | 'video' | 'other' | 'directory'
 
 export interface DirectoryInfo {
   path: string;

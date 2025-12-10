@@ -2,6 +2,8 @@ use serde::Serialize;
 use std::fs;
 use std::time::UNIX_EPOCH;
 use base64::{Engine as _, engine::general_purpose};
+use image::{self, imageops, ImageFormat};
+use std::path::Path;
 
 
 #[derive(Debug, Serialize)]
@@ -153,6 +155,38 @@ async fn get_directory_stats(path: String) -> Result<DirectoryStats, String> {
     })
 }
 
+#[tauri::command]
+async fn get_thumbnail(path: String, width: u32, height: u32) -> Result<String, String> {
+    let path_obj = Path::new(&path);
+    if !path_obj.exists() {
+        return Err("Plik nie istnieje".to_string());
+    }
+    
+    let extension = path_obj.extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| ext.to_lowercase());
+    
+    let image_extensions = ["jpg", "jpeg", "png", "gif", "bmp", "webp"];
+    if !extension.map_or(false, |ext| image_extensions.contains(&ext.as_str())) {
+        return Err("Plik nie jest obsługiwanym formatem obrazu".to_string());
+    }
+    
+    let img = match image::open(&path) {
+        Ok(img) => img,
+        Err(e) => return Err(format!("Nie udało się otworzyć obrazu: {}", e)),
+    };
+    
+    let thumbnail = img.resize_to_fill(width, height, imageops::FilterType::Lanczos3);
+    
+    let mut bytes: Vec<u8> = Vec::new();
+    thumbnail
+        .write_to(&mut std::io::Cursor::new(&mut bytes), ImageFormat::Png)
+        .map_err(|e| format!("Nie udało się zapisać miniaturki: {}", e))?;
+    
+    let base64_string = general_purpose::STANDARD.encode(&bytes);
+    Ok(format!("data:image/png;base64,{}", base64_string))
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
@@ -161,7 +195,8 @@ fn main() {
             read_directory,
             read_file_as_base64,
             check_directory,
-            get_directory_stats
+            get_directory_stats,
+            get_thumbnail
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

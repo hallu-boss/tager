@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Card,
   CardMedia,
@@ -16,36 +16,88 @@ import ImageIcon from "@mui/icons-material/Image";
 import MovieIcon from "@mui/icons-material/Movie";
 import DescriptionIcon from "@mui/icons-material/Description";
 import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
+import type { EntryType } from "../types";
+import { invoke } from "@tauri-apps/api/core";
 
 const iconSize = 60;
 
 // ikony zależne od rozszerzenia
 const extensionIcons: Record<string, React.ReactNode> = {
-  pdf: <PictureAsPdfIcon sx={{ fontSize: iconSize }} />,
-  jpg: <ImageIcon sx={{ fontSize: iconSize }} />,
-  jpeg: <ImageIcon sx={{ fontSize: iconSize }} />,
-  png: <ImageIcon sx={{ fontSize: iconSize }} />,
-  mp4: <MovieIcon sx={{ fontSize: iconSize }} />,
-  docx: <DescriptionIcon sx={{ fontSize: iconSize }} />,
-  default: <InsertDriveFileIcon sx={{ fontSize: iconSize }} />,
+  pdf: <PictureAsPdfIcon sx={{ fontSize: iconSize }} color="error" />,
+  jpg: <ImageIcon sx={{ fontSize: iconSize }} color="success" />,
+  jpeg: <ImageIcon sx={{ fontSize: iconSize }} color="success" />,
+  png: <ImageIcon sx={{ fontSize: iconSize }} color="success" />,
+  gif: <ImageIcon sx={{ fontSize: iconSize }} color="success" />,
+  bmp: <ImageIcon sx={{ fontSize: iconSize }} color="success" />,
+  webp: <ImageIcon sx={{ fontSize: iconSize }} color="success" />,
+  mp4: <MovieIcon sx={{ fontSize: iconSize }} color="warning" />,
+  avi: <MovieIcon sx={{ fontSize: iconSize }} color="warning" />,
+  mov: <MovieIcon sx={{ fontSize: iconSize }} color="warning" />,
+  mkv: <MovieIcon sx={{ fontSize: iconSize }} color="warning" />,
+  docx: <DescriptionIcon sx={{ fontSize: iconSize }} color="info" />,
+  doc: <DescriptionIcon sx={{ fontSize: iconSize }} color="info" />,
+  txt: <DescriptionIcon sx={{ fontSize: iconSize }} color="action" />,
+  default: <InsertDriveFileIcon sx={{ fontSize: iconSize }} color="action" />,
 };
 
 interface FileCardProps {
   name: string;
-  thumbnail?: string;
+  path: string
   tags: string[];
   size?: string;
   modified?: string;
   onAddTag?: () => void;
+  type: EntryType;
 }
 
-export default function FileCard({ name, thumbnail, tags }: FileCardProps) {
+export default function FileCard({ name, path, tags, type }: FileCardProps) {
   const [loadError, setLoadError] = useState(false);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isImage, setIsImage] = useState(false);
 
   const ext = name.split(".").pop()?.toLowerCase() || "";
+
+  useEffect(() => {
+    if (type === "image") {
+      setIsImage(true);
+    }
+  }, [type, ext])
+
+   useEffect(() => {
+    const loadThumbnail = async () => {
+      if (!isImage || loadError) return;
+      
+      setIsLoading(true);
+      try {
+        const thumbnail = await invoke<string>("get_thumbnail", {
+          path,
+          width: 300,
+          height: 200,
+        });
+        
+        if (thumbnail && thumbnail.length > 0) {
+          console.log(thumbnail);
+          setImageUrl(thumbnail);
+        } else {
+          console.log("thumbnail");
+          setLoadError(true);
+        }
+      } catch (error) {
+        console.error("Błąd ładowania miniaturki:", error);
+        setLoadError(true);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadThumbnail();
+  }, [path, isImage, loadError]);
+
   const icon = extensionIcons[ext] ?? extensionIcons.default;
 
-  const hasThumbnail = thumbnail && !loadError;
+  const shouldShowThumbnail = isImage && imageUrl && !loadError && !isLoading;
+  console.log(shouldShowThumbnail)
 
   return (
     <Card sx={{ borderRadius: 2, boxShadow: 1, '&:hover': { boxShadow: 4 } }}>
@@ -62,10 +114,10 @@ export default function FileCard({ name, thumbnail, tags }: FileCardProps) {
             position: 'relative',
           }}
         >
-          {hasThumbnail ? (
+          {shouldShowThumbnail ? (
             <CardMedia
               component="img"
-              image={thumbnail}
+              image={imageUrl}
               alt={name}
               onError={() => setLoadError(true)}
               sx={{
