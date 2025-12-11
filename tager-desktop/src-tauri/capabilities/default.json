@@ -8,9 +8,12 @@
   "permissions": [
     "core:default",
     "fs:default",
-        {
+    {
       "identifier": "fs:allow-read-dir",
-      "allow": ["**"]
-    }
+      "allow": [
+        "**"
+      ]
+    },
+    "dialog:default"
   ]
 }

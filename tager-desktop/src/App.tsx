@@ -6,65 +6,33 @@ import {
   Toolbar,
   Typography,
   IconButton,
-  Divider,
-  Chip,
-  Stack,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
-  Folder as FolderIcon,
-  InsertDriveFile as InsertDriveFileIcon,
-  Tag as TagIcon,
   Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import MainView from './components/MainView';
 import { MOCK_DIRECTORY_PATH } from './types';
+import SidePanel from './components/SidePanel';
 
 const drawerWidth = 280;
 
 function App() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [directoryPath] = useState(MOCK_DIRECTORY_PATH);
+  const [directoryPath, setDirectoryPath] = useState(MOCK_DIRECTORY_PATH);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
   };
 
   const drawer = (
-    <div>
-      <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
-        <FolderIcon color="primary" />
-        <Box>
-          <Typography variant="subtitle2" color="text.secondary">
-            Aktywny katalog
-          </Typography>
-          <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>
-            {directoryPath}
-          </Typography>
-        </Box>
-      </Box>
-      <Divider />
-      <Box sx={{ p: 2 }}>
-        <Typography variant="caption" color="text.secondary">
-          Statystyki
-        </Typography>
-        <Stack direction="row" spacing={1}>
-          <Chip 
-            icon={<InsertDriveFileIcon />} 
-            label="42 pliki" 
-            variant="outlined" 
-            size="small" 
-          />
-          <Chip 
-            icon={<TagIcon />} 
-            label="15 tagów" 
-            variant="outlined" 
-            size="small" 
-          />
-        </Stack>
-      </Box>
-    </div>
-  );
+    <SidePanel 
+      directoryPath={directoryPath}
+      onDirectoryChange={setDirectoryPath}
+      filesCount={10}
+      tagsCount={10}
+    />
+  )
 
   return (
     <Box sx={{ display: 'flex', height: '100vh', width: '100vw' }}>
