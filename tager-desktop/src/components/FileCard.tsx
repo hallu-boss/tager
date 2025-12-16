@@ -18,6 +18,7 @@ import DescriptionIcon from "@mui/icons-material/Description";
 import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
 import type { EntryType } from "../types";
 import { invoke } from "@tauri-apps/api/core";
+import { useFileStore } from "../store";
 
 const iconSize = 60;
 
@@ -41,22 +42,26 @@ const extensionIcons: Record<string, React.ReactNode> = {
 };
 
 interface FileCardProps {
+  index: number;
   name: string;
   path: string
   tags: string[];
   size?: string;
   modified?: string;
   onAddTag?: () => void;
+  onCardClick?: () => void;
   type: EntryType;
 }
 
-export default function FileCard({ name, path, tags, type }: FileCardProps) {
+export default function FileCard({ index, name, path, tags, type, onCardClick }: FileCardProps) {
   const [loadError, setLoadError] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isImage, setIsImage] = useState(false);
 
   const ext = name.split(".").pop()?.toLowerCase() || "";
+
+  const updateFile = useFileStore(s => s.updateFile)
 
   useEffect(() => {
     if (type === "image") {
@@ -79,6 +84,7 @@ export default function FileCard({ name, path, tags, type }: FileCardProps) {
         if (thumbnail && thumbnail.length > 0) {
           console.log(thumbnail);
           setImageUrl(thumbnail);
+          updateFile(index, { thumbnail })
         } else {
           console.log("thumbnail");
           setLoadError(true);
@@ -101,7 +107,7 @@ export default function FileCard({ name, path, tags, type }: FileCardProps) {
 
   return (
     <Card sx={{ borderRadius: 2, boxShadow: 1, '&:hover': { boxShadow: 4 } }}>
-      <CardActionArea>
+      <CardActionArea onClick={onCardClick}>
         {/* --- Miniatura lub ikona --- */}
         <Box
           sx={{
@@ -113,6 +119,7 @@ export default function FileCard({ name, path, tags, type }: FileCardProps) {
             overflow: 'hidden',
             position: 'relative',
           }}
+          
         >
           {shouldShowThumbnail ? (
             <CardMedia

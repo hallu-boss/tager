@@ -15,6 +15,7 @@ import { FilterList as FilterListIcon } from "@mui/icons-material";
 import FileCard from "./FileCard";
 import type { EntryType, FileInfo, FileItem } from "../types";
 import { invoke } from "@tauri-apps/api/core";
+import { useFileStore } from "../store";
 
 interface MainViewProps {
   directoryPath: string;
@@ -24,9 +25,15 @@ export default function MainView({ directoryPath }: MainViewProps) {
   const [query, setQuery] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [files, setFiles] = useState<FileItem[]>([]);
   const [allTags, setAllTags] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  const files = useFileStore(s => s.files);
+  const setFiles = useFileStore(s => s.setFiles)
+  const select = useFileStore(s => s.select);
+  const selectedFile = useFileStore(s => s.selectedIndex)
+
+  console.log(selectedFile)
 
   async function loadFiles() {
     try {
@@ -89,11 +96,6 @@ export default function MainView({ directoryPath }: MainViewProps) {
     setSelectedTags((prev) =>
       prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
     );
-  };
-
-  const handleAddTag = (fileId: number) => {
-    // Tutaj będzie logika dodawania tagu do pliku
-    console.log("Dodaj tag do pliku:", fileId);
   };
 
   const filteredFiles = files.filter((file) => {
@@ -217,7 +219,7 @@ export default function MainView({ directoryPath }: MainViewProps) {
             Znaleziono {filteredFiles.length} plików
           </Typography>
           <Grid container spacing={2}>
-            {filteredFiles.map((file) => (
+            {filteredFiles.map((file, index) => (
               <Grid 
                 key={file.id}
                 size={{ xs: 12, md: "auto"}}
@@ -226,10 +228,11 @@ export default function MainView({ directoryPath }: MainViewProps) {
                 }}
               >
                 <FileCard
+                  index={index}
                   name={file.name}
                   path={file.path}
                   tags={file.tags}
-                  onAddTag={() => handleAddTag(file.id)}
+                  onCardClick={() => select(index)}
                   size={formatFileSize(file.size)}
                   modified={file.modified}
                   type={file.type}
