@@ -7,7 +7,6 @@ import {
   Chip, 
   Tooltip,
   Badge,
-  Avatar
 } from "@mui/material";
 import {
   Folder as FolderIcon,
