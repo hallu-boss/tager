@@ -152,7 +152,7 @@ export default function MainView({ directoryPath }: MainViewProps) {
       {/* Pasek wyszukiwania i filtrów */}
       <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
         <TextField
-          label="Wyszukaj pliki lub tagi"
+          label="Wyszukaj nazwę pliku"
           variant="outlined"
           value={query}
           onChange={(e) => setQuery(e.target.value)}

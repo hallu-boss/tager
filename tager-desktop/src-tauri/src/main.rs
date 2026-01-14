@@ -197,6 +197,7 @@ async fn get_thumbnail(path: String, width: u32, height: u32) -> Result<String, 
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .invoke_handler(tauri::generate_handler![

@@ -19,6 +19,7 @@ import {
   FolderOpen as FolderOpenIcon,
 } from '@mui/icons-material';
 import { open } from '@tauri-apps/plugin-dialog';
+import { openPath } from '@tauri-apps/plugin-opener';
 import { useFileStore } from "../store";
 import type { EntryType } from "../types";
 
@@ -96,6 +97,14 @@ export default function SidePanel({
       console.error('Błąd przy wyborze folderu:', error);
     }
   };
+
+  const handleOpenFile = async (filePath: string) => {
+    try {
+      await openPath(filePath);
+    } catch (err) {
+      console.log('open file error: ', err);
+    }
+  }
 
   return (
     <Box sx={{ 
@@ -241,8 +250,13 @@ export default function SidePanel({
                         whiteSpace: 'nowrap',
                         fontFamily: 'monospace',
                         fontSize: '0.8rem',
+                        '&:hover': {
+                          textDecoration: 'underline',
+                          cursor: 'pointer',
+                        }
                       }}
-                      title={selectedFile.path}
+                      title={`Kliknij, aby otworzyć: ${selectedFile.path}`}
+                      onClick={() => handleOpenFile(selectedFile.path)}
                     >
                       {selectedFile.path}
                     </Typography>
