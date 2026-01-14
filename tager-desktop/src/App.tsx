@@ -98,6 +98,7 @@ function App() {
           width: { sm: `calc(100% - ${drawerWidth}px)` },
           height: '100vh',
           overflow: 'auto',
+          bgcolor: 'background.paper'
         }}
       >
         <Toolbar /> {/* Spacing for AppBar */}

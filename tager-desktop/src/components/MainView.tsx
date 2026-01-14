@@ -81,8 +81,8 @@ export default function MainView({ directoryPath }: MainViewProps) {
       setAllTags([]);
     } catch (err) {
       const errMsg = `Błąd przy pobieraniu plików ${err}`
-      console.error(errMsg)
       setError(errMsg)
+      console.error(error)
     } finally {
       setIsLoading(false);
     }
