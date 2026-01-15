@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    io::Read, // Dodane
+    io::{self, Read}, // Dodane
     os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
 };
@@ -19,6 +19,8 @@ pub struct TagerManager {
     tager_dir: PathBuf,
     /// Ścieżka do pliku bazy danych
     db_path: PathBuf,
+    /// Ścieżka do pliku z hashem katalogu
+    hash_path: PathBuf,
     /// Instancja bazy danych
     db: Database,
     /// Flaga inicjalizacji
@@ -28,7 +30,7 @@ pub struct TagerManager {
 impl TagerManager {
     /// Tworzy nowy TagerManager dla danego katalogu
     /// Nie inicjalizuje bazy danych - do tego służy metoda `init()`
-    pub async fn new<P: AsRef<Path>>(root: P) -> Result<Self, String> {
+   pub async fn new<P: AsRef<Path>>(root: P) -> Result<Self, String> {
         let root = root.as_ref().to_path_buf();
 
         if !root.exists() {
@@ -41,8 +43,8 @@ impl TagerManager {
 
         let tager_dir = root.join(".tager");
         let db_path = tager_dir.join("db.sqlite");
+        let hash_path = tager_dir.join("root_hash");
 
-        // Tworzymy tymczasową bazę w pamięci jako placeholder
         let db = Database::new_in_memory()
             .await
             .map_err(|e| format!("Nie udało się utworzyć tymczasowej bazy danych: {}", e))?;
@@ -51,6 +53,7 @@ impl TagerManager {
             root,
             tager_dir,
             db_path,
+            hash_path,
             db,
             is_initialized: false,
         })
@@ -61,20 +64,67 @@ impl TagerManager {
     /// - Tworzy bazę danych w pliku
     /// - Inicjalizuje schemat bazy danych
     pub async fn init(&mut self) -> Result<(), DbError> {
-        // Utwórz katalog .tager jeśli nie istnieje
         if !self.tager_dir.exists() {
-            std::fs::create_dir_all(&self.tager_dir).map_err(DbError::Io)?;
+            fs::create_dir_all(&self.tager_dir).map_err(DbError::Io)?;
             println!("Utworzono katalog: {}", self.tager_dir.display());
         }
 
-        // Utwórz bazę danych w pliku
         self.db = Database::new_from_file(&self.db_path).await?;
-
         self.is_initialized = true;
+        
         Ok(())
     }
 
-    /// Synchronizuje rekordy bazy danych z zawartością katalogu root
+    /// Oblicza hash całego katalogu root (z wyłączeniem .tager)
+    fn calculate_root_hash(&self) -> Result<String, String> {
+        let mut hasher = Sha256::new();
+        let mut file_hashes = Vec::new();
+
+        // Zbierz i posortuj wszystkie pliki dla deterministycznego wyniku
+        for entry in WalkDir::new(&self.root)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_type().is_file())
+            .filter(|e| !e.path().starts_with(&self.tager_dir))
+        {
+            let hash = Self::hash_file(entry.path())
+                .map_err(|e| format!("Błąd hashowania {}: {}", entry.path().display(), e))?;
+            
+            // Dodaj ścieżkę względną i hash do listy
+            let rel_path = entry.path()
+                .strip_prefix(&self.root)
+                .map_err(|e| format!("Błąd konwersji ścieżki: {}", e))?
+                .to_string_lossy();
+            
+            file_hashes.push((rel_path.to_string(), hash));
+        }
+
+        // Posortuj dla deterministycznego hasha
+        file_hashes.sort_by(|a, b| a.0.cmp(&b.0));
+
+        // Dodaj wszystkie posortowane pary (ścieżka, hash) do głównego hashera
+        for (path, hash) in file_hashes {
+            hasher.update(path.as_bytes());
+            hasher.update(hash.as_bytes());
+        }
+
+        let result = hasher.finalize();
+        Ok(format!("{:x}", result))
+    }
+
+    /// Oblicza i zapisuje hash katalogu root
+    fn calculate_and_save_root_hash(&self) -> Result<(), String> {
+        let hash = self.calculate_root_hash()?;
+        self.write_root_hash(&hash)
+    }
+
+    /// Zapisuje hash katalogu root
+    fn write_root_hash(&self, hash: &str) -> Result<(), String> {
+        fs::write(&self.hash_path, hash)
+            .map_err(|e| format!("Nie udało się zapisać hash: {}", e))
+    }
+
+ /// Synchronizuje rekordy bazy danych z zawartością katalogu root
     pub async fn sync(&self) -> Result<(), String> {
         if !self.is_initialized {
             return Err(
@@ -82,6 +132,46 @@ impl TagerManager {
             );
         }
 
+        // Sprawdź czy hash się zgadza
+        if self.should_skip_sync()? {
+            println!("Hash katalogu root się nie zmienił. Pomijam synchronizację.");
+            return Ok(());
+        }
+
+        // Przeprowadź pełną synchronizację
+        self.full_sync().await?;
+
+        // Oblicz i zapisz nowy hash
+        self.calculate_and_save_root_hash()?;
+
+        Ok(())
+    }
+
+    /// Sprawdza czy synchronizacja jest potrzebna porównując hashe
+    fn should_skip_sync(&self) -> Result<bool, String> {
+        let current_hash = self.calculate_root_hash()
+            .map_err(|e| format!("Nie udało się obliczyć aktualnego hash: {}", e))?;
+        
+        let saved_hash = self.read_root_hash()
+            .map_err(|e| format!("Nie udało się odczytać zapisanego hash: {}", e))?;
+        
+        match saved_hash {
+            Some(saved) => Ok(saved == current_hash),
+            None => Ok(false), // Brak zapisanego hash = zawsze wykonaj sync
+        }
+    }
+
+    /// Czyta zapisany hash katalogu root
+    fn read_root_hash(&self) -> Result<Option<String>, io::Error> {
+        if self.hash_path.exists() {
+            fs::read_to_string(&self.hash_path).map(Some)
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Pełna synchronizacja (oryginalna logika)
+    async fn full_sync(&self) -> Result<(), String> {
         let fs_map = self.get_root_snapshot()?;
         let db_files = self
             .db
@@ -94,7 +184,7 @@ impl TagerManager {
             .map(|f| (f.path.to_string_lossy().to_string(), f))
             .collect();
 
-        // Tworzymy mapę hash -> lista ścieżek (może być wiele plików o tym samym hash)
+        // Tworzymy mapę hash -> lista ścieżek
         let mut hash_to_paths: HashMap<String, Vec<String>> = HashMap::new();
         for (path, db_file) in &db_map {
             hash_to_paths
@@ -103,13 +193,11 @@ impl TagerManager {
                 .push(path.clone());
         }
 
-        // Dla każdego pliku w systemie plików
+        // Synchronizacja plików
         for (path, fs_file) in &fs_map {
             match db_map.get(path) {
                 Some(db_file) => {
-                    // Aktualizacja jeśli się zmienił
-                    if db_file.content_hash != fs_file.content_hash
-                    {
+                    if db_file.content_hash != fs_file.content_hash {
                         self.db
                             .update_file(
                                 db_file.id,
@@ -123,23 +211,17 @@ impl TagerManager {
                             .await
                             .map_err(|e| e.to_string())?;
                     }
-                    // Oznacz jako obsłużony - usuwamy z db_map
                     db_map.remove(path);
                 }
                 None => {
-                    // Sprawdź czy istnieje plik o tym samym hashu w db_map
                     let mut potential_move = None;
                     if let Some(paths) = hash_to_paths.get(&fs_file.content_hash) {
-                        // Sprawdź każdą ścieżkę z tym samym hashem
                         for old_path in paths {
                             if let Some(old_file) = db_map.get(old_path) {
-                                // Potencjalne przeniesienie - upewnijmy się że to ten sam plik
                                 if old_file.size == fs_file.size
                                     && old_file.content_hash == fs_file.content_hash
                                 {
-                                    // To prawdopodobnie przeniesiony plik
                                     potential_move = Some(old_file.id);
-                                    // Usuwamy starą ścieżkę z db_map aby nie została usunięta
                                     db_map.remove(old_path);
                                     break;
                                 }
@@ -148,7 +230,6 @@ impl TagerManager {
                     }
 
                     if let Some(file_id) = potential_move {
-                        // Plik przeniesiony - aktualizuj ścieżkę
                         self.db
                             .update_file(
                                 file_id,
@@ -162,7 +243,6 @@ impl TagerManager {
                             .await
                             .map_err(|e| e.to_string())?;
                     } else {
-                        // Nowy plik
                         self.db
                             .create_file(
                                 fs_file.path.clone(),
@@ -179,7 +259,7 @@ impl TagerManager {
             }
         }
 
-        // Usuń pliki które zniknęły z systemu plików (nie zostały ani znalezione, ani przeniesione)
+        // Usuń pozostałe pliki z bazy
         for (_, db_file) in db_map {
             self.db
                 .delete_file(db_file.id)
