@@ -108,9 +108,7 @@ impl TagerManager {
             match db_map.get(path) {
                 Some(db_file) => {
                     // Aktualizacja jeśli się zmienił
-                    if db_file.size != fs_file.size
-                        || db_file.last_modified != fs_file.last_modified
-                        || db_file.content_hash != fs_file.content_hash
+                    if db_file.content_hash != fs_file.content_hash
                     {
                         self.db
                             .update_file(

@@ -13,7 +13,7 @@ impl Database {
     /// Tworzy nową bazę danych w pamięci
     pub async fn new_in_memory() -> Result<Self, DbError> {
         let pool = SqlitePoolOptions::new()
-            .max_connections(5)
+            .max_connections(1)
             .connect("sqlite::memory:")
             .await
             .map_err(DbError::Sql)?;
@@ -47,7 +47,7 @@ impl Database {
         }
 
         let pool = SqlitePoolOptions::new()
-            .max_connections(5)
+            .max_connections(1)
             .connect(&db_url)
             .await
             .map_err(DbError::Sql)?;
