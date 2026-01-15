@@ -1,9 +1,13 @@
+mod commands;
+
 use base64::{engine::general_purpose, Engine as _};
+use commands::AppState;
 use image::{self, imageops, ImageFormat};
 use serde::Serialize;
 use std::fs;
 use std::path::Path;
 use std::time::UNIX_EPOCH;
+use tokio::sync::Mutex;
 
 #[derive(Debug, Serialize)]
 struct FileInfo {
@@ -197,6 +201,9 @@ async fn get_thumbnail(path: String, width: u32, height: u32) -> Result<String, 
 
 fn main() {
     tauri::Builder::default()
+        .manage(AppState {
+            manager: Mutex::new(None),
+        })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -206,7 +213,15 @@ fn main() {
             read_file_as_base64,
             check_directory,
             get_directory_stats,
-            get_thumbnail
+            get_thumbnail,
+            commands::init_tager_manager,
+            commands::get_filtered_files,
+            commands::get_files_without_tags,
+            commands::assign_tag_to_file,
+            commands::get_all_tags,
+            commands::sync_and_get_files,
+            commands::get_manager_status,
+            commands::disconnect_manager,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
