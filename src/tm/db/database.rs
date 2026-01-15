@@ -136,7 +136,7 @@ impl Database {
             RETURNING id
             "#,
         )
-        .bind(path_str)
+        .bind(&path_str)
         .bind(size as i64)
         .bind(content_hash)
         .bind(system_time_to_i64(last_modified))
@@ -145,6 +145,9 @@ impl Database {
         .fetch_one(&self.pool)
         .await
         .map_err(DbError::Sql)?;
+
+        let id: i64 = row.get("id");
+        print!("utworzono pliczek {} {} {}\n", id, path_str, size);
 
         Ok(row.get::<i64, _>("id"))
     }
@@ -185,6 +188,12 @@ impl Database {
             }
             None => Ok(None),
         }
+    }
+
+    /// Pobiera plik po hash (SHA-256) - zwraca pierwszy znaleziony
+    pub async fn get_file_by_hash(&self, content_hash: &str) -> Result<Option<DBFile>, DbError> {
+        let files = self.get_files_by_hash(content_hash).await?;
+        Ok(files.into_iter().next())
     }
 
     /// Pobiera wszystkie pliki (z opcjonalnymi parametrami paginacji)
@@ -350,6 +359,8 @@ impl Database {
             .await
             .map_err(DbError::Sql)?;
 
+        print!("updated {} files id={} query={}\n", result.rows_affected(), id, query.to_string());
+
         Ok(result.rows_affected() > 0)
     }
 
@@ -365,6 +376,8 @@ impl Database {
         .execute(&self.pool)
         .await
         .map_err(DbError::Sql)?;
+
+        print!("deleted id={} file", id);
 
         Ok(result.rows_affected() > 0)
     }
