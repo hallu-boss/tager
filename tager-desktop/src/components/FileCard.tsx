@@ -18,7 +18,7 @@ import DescriptionIcon from "@mui/icons-material/Description";
 import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
 import type { EntryType } from "../types";
 import { invoke } from "@tauri-apps/api/core";
-import { useFileStore } from "../store";
+import { useTagerStore } from "../store";
 
 const iconSize = 60;
 
@@ -42,7 +42,7 @@ const extensionIcons: Record<string, React.ReactNode> = {
 };
 
 interface FileCardProps {
-  index: number;
+  id: number;
   name: string;
   path: string
   tags: string[];
@@ -53,7 +53,7 @@ interface FileCardProps {
   type: EntryType;
 }
 
-export default function FileCard({ index, name, path, tags, type, onCardClick }: FileCardProps) {
+export default function FileCard({ id, name, path, tags, type, onCardClick }: FileCardProps) {
   const [loadError, setLoadError] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -61,7 +61,7 @@ export default function FileCard({ index, name, path, tags, type, onCardClick }:
 
   const ext = name.split(".").pop()?.toLowerCase() || "";
 
-  const updateFile = useFileStore(s => s.updateFile)
+  const {updateFile} = useTagerStore();
 
   useEffect(() => {
     if (type === "image") {
@@ -82,11 +82,9 @@ export default function FileCard({ index, name, path, tags, type, onCardClick }:
         });
         
         if (thumbnail && thumbnail.length > 0) {
-          console.log(thumbnail);
           setImageUrl(thumbnail);
-          updateFile(index, { thumbnail })
+          updateFile(id, { thumbnail })
         } else {
-          console.log("thumbnail");
           setLoadError(true);
         }
       } catch (error) {
@@ -103,7 +101,6 @@ export default function FileCard({ index, name, path, tags, type, onCardClick }:
   const icon = extensionIcons[ext] ?? extensionIcons.default;
 
   const shouldShowThumbnail = isImage && imageUrl && !loadError && !isLoading;
-  console.log(shouldShowThumbnail)
 
   return (
     <Card sx={{ borderRadius: 2, boxShadow: 1, '&:hover': { boxShadow: 4 } }}>

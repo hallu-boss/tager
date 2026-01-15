@@ -13,9 +13,7 @@ import {
 } from "@mui/material";
 import { FilterList as FilterListIcon } from "@mui/icons-material";
 import FileCard from "./FileCard";
-import type { EntryType, FileInfo, FileItem } from "../types";
-import { invoke } from "@tauri-apps/api/core";
-import { useFileStore } from "../store";
+import { useTagerStore } from "../store";
 
 interface MainViewProps {
   directoryPath: string;
@@ -24,67 +22,29 @@ interface MainViewProps {
 export default function MainView({ directoryPath }: MainViewProps) {
   const [query, setQuery] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [allTags, setAllTags] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const files = useFileStore(s => s.files);
-  const setFiles = useFileStore(s => s.setFiles)
-  const select = useFileStore(s => s.select);
-  const selectedFile = useFileStore(s => s.selectedIndex)
-
-  console.log(selectedFile)
+  const {files, init: tager_init, loading: files_loading, select} = useTagerStore();
 
   async function loadFiles() {
     try {
-      setIsLoading(true);
       setError(null);
 
       console.log("ładuję pliki z be");
 
-      const fileInfos: FileInfo[] = await invoke("read_directory_with_metadata", {
-        path: directoryPath
-      })
+      try {
+        await tager_init(directoryPath);
+        console.log(files);
+      } catch (err) {
+        console.error('Błąd inicjalizacji:', err);
+      }
 
-      console.log(fileInfos)
-
-      const fileItems: FileItem[] = fileInfos.map((info, index) => {
-
-        let type: EntryType = "other";
-        if (info.is_dir) {
-          type = "directory";
-        } else if (info.extension) {
-          const ext = info.extension.toLowerCase();
-          if (["jpg", "jpeg", "png", "gif", "bmp", "webp"].includes(ext)) {
-            type = "image";
-          } else if (["pdf", "docx", "doc", "txt", "rtf"].includes(ext)) {
-            type = "document";
-          } else if (["mp4", "avi", "mov", "mkv", "wmv"].includes(ext)) {
-            type = "video";
-          }
-        }
-
-        return {
-          id: index,
-          name: info.name,
-          path: info.path,
-          thumbnail: undefined,
-          tags: [],
-          size: info.size,
-          modified: new Date(info.modified * 1000).toISOString(),
-          type,
-          isDir: info.is_dir,
-        }
-      })
-
-      setFiles(fileItems)
       setAllTags([]);
     } catch (err) {
       const errMsg = `Błąd przy pobieraniu plików ${err}`
       setError(errMsg)
       console.error(error)
-    } finally {
-      setIsLoading(false);
     }
   }
 
@@ -100,14 +60,14 @@ export default function MainView({ directoryPath }: MainViewProps) {
 
   const filteredFiles = files.filter((file) => {
     const matchesSearch =
-      file.name.toLowerCase().includes(query.toLowerCase()) ||
-      file.tags.some((tag) => tag.toLowerCase().includes(query.toLowerCase()));
+      file.file_name.toLowerCase().includes(query.toLowerCase()) ||
+      file.tags.some((tag) => tag.name.toLowerCase().includes(query.toLowerCase()));
 
-    const matchesTags =
-      selectedTags.length === 0 ||
-      selectedTags.every((tag) => file.tags.includes(tag));
+    // const matchesTags =
+    //   selectedTags.length === 0 ||
+    //   selectedTags.every((tag) => file.tags.includes(tag));
 
-    return matchesSearch && matchesTags;
+    return matchesSearch;
   });
 
   const formatFileSize = (bytes: number) => {
@@ -197,14 +157,14 @@ export default function MainView({ directoryPath }: MainViewProps) {
       </Box>
 
       {/* Komunikat ładowania */}
-      {isLoading && (
+      {files_loading && (
         <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
           <CircularProgress />
         </Box>
       )}
 
       {/* Komunikat o braku wyników */}
-      {!isLoading && filteredFiles.length === 0 && (
+      {!files_loading && filteredFiles.length === 0 && (
         <Alert severity="info">
           {query || selectedTags.length > 0
             ? "Nie znaleziono plików spełniających kryteria wyszukiwania."
@@ -213,28 +173,28 @@ export default function MainView({ directoryPath }: MainViewProps) {
       )}
 
       {/* Siatka plików */}
-      {!isLoading && filteredFiles.length > 0 && (
+      {!files_loading && filteredFiles.length > 0 && (
         <>
           <Typography variant="body2" color="text.secondary">
             Znaleziono {filteredFiles.length} plików
           </Typography>
           <Grid container spacing={2}>
-            {filteredFiles.map((file, index) => (
-              <Grid 
+            {filteredFiles.map((file) => (
+              <Grid
                 key={file.id}
-                size={{ xs: 12, md: "auto"}}
+                size={{ xs: 12, md: "auto" }}
                 sx={{
                   minWidth: "250px"
                 }}
               >
                 <FileCard
-                  index={index}
-                  name={file.name}
-                  path={file.path}
-                  tags={file.tags}
-                  onCardClick={() => select(index)}
+                  id={file.id}
+                  name={file.file_name}
+                  path={file.abs_path}
+                  tags={file.tags.map(t => t.name)}
+                  onCardClick={() => select(file.id)}
                   size={formatFileSize(file.size)}
-                  modified={file.modified}
+                  modified={file.last_modified}
                   type={file.type}
                 />
               </Grid>
@@ -245,3 +205,4 @@ export default function MainView({ directoryPath }: MainViewProps) {
     </Box>
   );
 }
+

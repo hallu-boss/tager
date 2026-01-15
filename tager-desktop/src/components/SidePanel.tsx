@@ -20,7 +20,7 @@ import {
 } from '@mui/icons-material';
 import { open } from '@tauri-apps/plugin-dialog';
 import { openPath } from '@tauri-apps/plugin-opener';
-import { useFileStore } from "../store";
+import { useTagerStore } from "../store";
 import type { EntryType } from "../types";
 
 interface SidePanelProps {
@@ -74,12 +74,9 @@ export default function SidePanel({
   filesCount,
   tagsCount,
 }: SidePanelProps) {
-  const files = useFileStore(s => s.files);
-  const selectedIndex = useFileStore(s => s.selectedIndex);
+  const {files, selectedFileId} = useTagerStore();
   
-  const selectedFile = selectedIndex !== null && selectedIndex >= 0 && selectedIndex < files.length 
-    ? files[selectedIndex] 
-    : null;
+  const selectedFile = selectedFileId !== null && files.find(e => e.id === selectedFileId);
 
   const handleFolderPicker = async () => {
     try {
@@ -166,7 +163,7 @@ export default function SidePanel({
                     <Box
                       component="img"
                       src={selectedFile.thumbnail}
-                      alt={selectedFile.name}
+                      alt={selectedFile.file_name}
                       sx={{
                         width: '100%',
                         height: '100%',
@@ -184,7 +181,7 @@ export default function SidePanel({
                       mb: 0.5,
                     }}
                   >
-                    {selectedFile.name}
+                    {selectedFile.file_name}
                   </Typography>
                   
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
@@ -225,7 +222,7 @@ export default function SidePanel({
                       fontSize: '0.75rem',
                     }}
                   >
-                    Zmodyfikowano: {formatDate(selectedFile.modified)}
+                    Zmodyfikowano: {formatDate(selectedFile.last_modified)}
                   </Typography>
                 </Box>
               </Stack>
@@ -255,10 +252,10 @@ export default function SidePanel({
                           cursor: 'pointer',
                         }
                       }}
-                      title={`Kliknij, aby otworzyć: ${selectedFile.path}`}
-                      onClick={() => handleOpenFile(selectedFile.path)}
+                      title={`Kliknij, aby otworzyć: ${selectedFile.abs_path}`}
+                      onClick={() => handleOpenFile(selectedFile.abs_path)}
                     >
-                      {selectedFile.path}
+                      {selectedFile.abs_path}
                     </Typography>
                   </Box>
                   
@@ -294,7 +291,7 @@ export default function SidePanel({
                     {selectedFile.tags.map((tag, index) => (
                       <Chip 
                         key={index} 
-                        label={tag} 
+                        label={tag.name} 
                         size="small" 
                         color="primary"
                         variant="outlined"
