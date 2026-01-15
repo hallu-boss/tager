@@ -222,6 +222,7 @@ fn main() {
             commands::sync_and_get_files,
             commands::get_manager_status,
             commands::disconnect_manager,
+            commands::remove_tag_from_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -34,6 +34,7 @@ type TagerState = {
   select: (id: number | null) => void;
   filter: (name?: string, tags?: string[]) => Promise<void>;
   assignTag: (filePath: string, tagName: string) => Promise<void>;
+  removeTag: (filePath: string, tagName: string) => Promise<void>;
   disconnect: () => Promise<void>;
 };
 
@@ -75,7 +76,7 @@ export const useTagerStore = create<TagerState>((set) => ({
       files: state.files.map((n) =>
         n.id === id ? { ...n, ...data } : n
       ),
-  })),
+    })),
 
   refresh: async () => {
     set({ loading: true });
@@ -118,13 +119,66 @@ export const useTagerStore = create<TagerState>((set) => ({
     }
   },
 
+  removeTag: async (filePath, tagName) => {
+    try {
+      await api.removeTagFromFile(filePath, tagName);
+
+      // szybki refresh
+      const newFiles = await api.syncAndGetFiles();
+      set((state) => {
+        const oldFilesMap = new Map(
+          state.files.map(f => [f.id, f])
+        );
+
+        const mergedFiles = newFiles.map(file => {
+          const old = oldFilesMap.get(file.id);
+          return {
+            ...file,
+            thumbnail:
+              file.thumbnail != null
+                ? file.thumbnail
+                : old?.thumbnail,
+          };
+        });
+
+        return {
+          files: mergedFiles
+        }
+      }
+      );
+    } catch (e) {
+      set({ error: String(e) });
+    }
+
+  },
+
   assignTag: async (filePath, tagName) => {
     try {
       await api.assignTagToFile(filePath, tagName);
 
       // szybki refresh
-      const files = await api.syncAndGetFiles();
-      set({ files });
+      const newFiles = await api.syncAndGetFiles();
+      set((state) => {
+        const oldFilesMap = new Map(
+          state.files.map(f => [f.id, f])
+        );
+
+        const mergedFiles = newFiles.map(file => {
+          const old = oldFilesMap.get(file.id);
+          return {
+            ...file,
+            thumbnail:
+              file.thumbnail != null
+                ? file.thumbnail
+                : old?.thumbnail,
+          };
+        });
+
+        return {
+          files: mergedFiles
+        }
+      }
+      );
     } catch (e) {
       set({ error: String(e) });
     }

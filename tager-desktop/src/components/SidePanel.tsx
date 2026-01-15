@@ -7,6 +7,9 @@ import {
   Chip, 
   Tooltip,
   Badge,
+  TextField,
+  Autocomplete,
+  Popover,
 } from "@mui/material";
 import {
   Folder as FolderIcon,
@@ -17,11 +20,13 @@ import {
   Image as ImageIcon,
   Description as DescriptionIcon,
   FolderOpen as FolderOpenIcon,
+  Add as AddIcon,
 } from '@mui/icons-material';
 import { open } from '@tauri-apps/plugin-dialog';
 import { openPath } from '@tauri-apps/plugin-opener';
 import { useTagerStore } from "../store";
 import type { EntryType } from "../types";
+import { useState, useRef } from 'react';
 
 interface SidePanelProps {
   directoryPath: string;
@@ -74,7 +79,11 @@ export default function SidePanel({
   filesCount,
   tagsCount,
 }: SidePanelProps) {
-  const {files, selectedFileId} = useTagerStore();
+  const { files, selectedFileId, tags, assignTag, removeTag } = useTagerStore();
+  const [isAddingTag, setIsAddingTag] = useState(false);
+  const [newTagName, setNewTagName] = useState('');
+  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+  const addButtonRef = useRef<HTMLDivElement>(null);
   
   const selectedFile = selectedFileId !== null && files.find(e => e.id === selectedFileId);
 
@@ -101,6 +110,42 @@ export default function SidePanel({
     } catch (err) {
       console.log('open file error: ', err);
     }
+  };
+
+  const handleAddTagClick = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget);
+    setIsAddingTag(true);
+  };
+
+  const handleAddTag = () => {
+    if (selectedFile && newTagName.trim()) {
+      assignTag(selectedFile.rel_path, newTagName.trim());
+      setNewTagName('');
+      setIsAddingTag(false);
+      setAnchorEl(null);
+    }
+  };
+
+  const handleTagInputKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === 'Enter') {
+      handleAddTag();
+    } else if (event.key === 'Escape') {
+      setIsAddingTag(false);
+      setNewTagName('');
+      setAnchorEl(null);
+    }
+  };
+
+  const handleTagInputClose = () => {
+    setIsAddingTag(false);
+    setNewTagName('');
+    setAnchorEl(null);
+  };
+
+  function handleDeleteTag(name: string) {
+    if (!selectedFile)
+      return
+    removeTag(selectedFile.rel_path, name);
   }
 
   return (
@@ -282,24 +327,34 @@ export default function SidePanel({
               </Box>
 
               {/* Tagi */}
-              {selectedFile.tags.length > 0 && (
-                <Box sx={{ mb: 3 }}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Tagi ({selectedFile.tags.length})
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                    {selectedFile.tags.map((tag, index) => (
-                      <Chip 
-                        key={index} 
-                        label={tag.name} 
-                        size="small" 
-                        color="primary"
-                        variant="outlined"
-                      />
-                    ))}
-                  </Box>
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="subtitle2" gutterBottom>
+                  Tagi ({selectedFile.tags.length})
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, alignItems: 'center' }}>
+                  {selectedFile.tags.map((tag, index) => (
+                    <Chip 
+                      key={index} 
+                      label={tag.name} 
+                      size="small" 
+                      color="primary"
+                      variant="outlined"
+                      onDelete={() => handleDeleteTag(tag.name)}
+                    />
+                  ))}
+                  
+                  <div ref={addButtonRef}>
+                    <Chip
+                      icon={<AddIcon />}
+                      label="Dodaj tag"
+                      size="small"
+                      variant="outlined"
+                      onClick={handleAddTagClick}
+                      sx={{ cursor: 'pointer' }}
+                    />
+                  </div>
                 </Box>
-              )}
+              </Box>
             </>
           ) : (
             // Widok domyślny (statystyki katalogu)
@@ -339,6 +394,62 @@ export default function SidePanel({
           )}
         </Box>
       </Box>
+
+      {/* Popover dla dodawania nowego tagu */}
+      <Popover
+        open={isAddingTag}
+        anchorEl={anchorEl}
+        onClose={handleTagInputClose}
+        anchorOrigin={{
+          vertical: 'center',
+          horizontal: 'center',
+        }}
+        transformOrigin={{
+          vertical: 'center',
+          horizontal: 'center',
+        }}
+        PaperProps={{
+          sx: {
+            p: 1,
+            width: 250,
+          }
+        }}
+      >
+        <Autocomplete
+          freeSolo
+          options={ selectedFile ?
+            tags.filter(tag => !selectedFile.tags.some(t => t.id === tag.id)).map(t => t.name) :
+            tags.map(t => t.name)
+          }
+          inputValue={newTagName}
+          onInputChange={(_, newValue) => {
+            setNewTagName(newValue);
+          }}
+          onKeyDown={handleTagInputKeyDown}
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              autoFocus
+              size="small"
+              fullWidth
+              placeholder="Wpisz nazwę tagu"
+              variant="outlined"
+            />
+          )}
+          renderOption={(props, option) => (
+            <li {...props}>
+              {option}
+            </li>
+          )}
+          slotProps={{
+            listbox: {
+              style: {
+                maxHeight: 200,
+              }
+            }
+          }}
+        />
+      </Popover>
     </Box>
   );
 }

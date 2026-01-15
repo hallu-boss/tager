@@ -167,6 +167,29 @@ pub async fn assign_tag_to_file(
 }
 
 #[tauri::command]
+pub async fn remove_tag_from_file(
+    app_handle: AppHandle,
+    file_path: String,
+    tag_name: String,
+) -> Result<(), String> {
+    let state: State<'_, AppState> = app_handle.state();
+    let state_lock = state.manager.lock().await;
+    
+    match &*state_lock {
+        Some(manager) => {
+            let path = std::path::Path::new(&file_path);
+            manager.remove_tag_from_file(path, &tag_name)
+                .await
+                .map_err(|e| format!("Nie udało się przypisać tagu do pliku: {}", e))?;
+            
+            log::info!("Przypisano tag '{}' do pliku: {}", tag_name, file_path);
+            Ok(())
+        }
+        None => Err("Manager nie jest zainicjalizowany. Wywołaj init_tager_manager najpierw.".to_string()),
+    }
+}
+
+#[tauri::command]
 pub async fn get_all_tags(
     app_handle: AppHandle,
 ) -> Result<Vec<TagEntryResponse>, String> {
