@@ -2,7 +2,7 @@ use tauri::{AppHandle, Manager, State};
 use tokio::sync::Mutex;
 use log;
 
-use app_lib::tm::{FileEntry, TagEntry, TagerManager};
+use app_lib::tm::{EntryType, FileEntry, TagEntry, TagerManager};
 
 
 #[derive(serde::Serialize)]
@@ -10,7 +10,9 @@ pub struct FileEntryResponse {
     pub id: i64,
     pub abs_path: String,
     pub rel_path: String,
-    pub file_name: String,
+    pub file_name: String, 
+    pub size: u64,
+    pub r#type: EntryType,
     pub tags: Vec<TagEntryResponse>,
     pub last_modified: String,
     pub created: String,
@@ -32,6 +34,8 @@ impl From<FileEntry> for FileEntryResponse {
             tags: entry.tags.into_iter().map(|t| t.into()).collect(),
             last_modified: entry.last_modified,
             created: entry.created,
+            size: entry.size,
+            r#type: entry.r#type
         }
     }
 }

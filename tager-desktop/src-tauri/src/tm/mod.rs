@@ -3,7 +3,8 @@ mod manager;
 mod scanner;
 
 pub use manager::{TagerManager, FileEntry, TagEntry};
-use std::{cmp::Ordering, time::{Duration, SystemTime, UNIX_EPOCH}};
+use ::serde::Serialize;
+use std::{cmp::Ordering, path::Path, time::{Duration, SystemTime, UNIX_EPOCH}};
 
 // Funkcje konwersji
 pub fn system_time_to_i64(st: SystemTime) -> i64 {
@@ -21,6 +22,29 @@ pub fn compare_system_times(a: SystemTime, b: SystemTime) -> Ordering {
     let b_ts = system_time_to_i64(b);
 
     a_ts.cmp(&b_ts)
+}
+
+#[derive(Debug, Serialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum EntryType {
+    Image,
+    Document,
+    Video,
+    Other,
+    Directory,
+}
+
+pub fn get_entry_type(path: &Path) -> EntryType {
+    if path.is_dir() {
+        EntryType::Directory
+    } else {
+        match path.extension().and_then(|ext| ext.to_str()).map(|s| s.to_lowercase()) {
+            Some(ext) if ["jpg", "jpeg", "png", "gif", "bmp", "webp"].contains(&ext.as_str()) => EntryType::Image,
+            Some(ext) if ["pdf", "doc", "docx", "txt", "md"].contains(&ext.as_str()) => EntryType::Document,
+            Some(ext) if ["mp4", "mkv", "avi", "mov"].contains(&ext.as_str()) => EntryType::Video,
+            _ => EntryType::Other,
+        }
+    }
 }
 
 #[cfg(test)]

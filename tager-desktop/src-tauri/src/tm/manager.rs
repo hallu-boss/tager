@@ -8,7 +8,7 @@ use std::{
 use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
 
-use crate::tm::db::{DBFile, Database, DbError};
+use crate::tm::{EntryType, db::{DBFile, Database, DbError}, get_entry_type};
 use std::fs;
 
 pub struct TagEntry {
@@ -21,6 +21,8 @@ pub struct FileEntry {
     pub abs_path: String,
     pub rel_path: String,
     pub file_name: String,
+    pub size: u64,
+    pub r#type: EntryType,
     pub tags: Vec<TagEntry>,
     pub last_modified: String,
     pub created: String,
@@ -459,9 +461,11 @@ impl TagerManager {
                 file_name: file.path.file_name()
                     .map(|n| n.to_string_lossy().to_string())
                     .unwrap_or_default(),
+                size: file.size,
                 tags,
                 last_modified: format!("{:?}", file.last_modified),
                 created: format!("{:?}", file.created),
+                r#type: get_entry_type(file.path.as_path()),
             };
             
             file_entries.push(file_entry);
@@ -533,9 +537,11 @@ impl TagerManager {
                     file_name: file.path.file_name()
                         .map(|n| n.to_string_lossy().to_string())
                         .unwrap_or_default(),
+                    size: file.size,
                     tags: Vec::new(), // Puste tagi
                     last_modified: format!("{:?}", file.last_modified),
                     created: format!("{:?}", file.created),
+                    r#type: get_entry_type(file.path.as_path())
                 };
                 
                 files_without_tags.push(file_entry);
