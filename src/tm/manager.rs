@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     io::{self, Read}, // Dodane
     os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
@@ -10,6 +10,21 @@ use walkdir::WalkDir;
 
 use crate::tm::db::{DBFile, Database, DbError};
 use std::fs;
+
+pub struct TagEntry {
+    pub id: i64,
+    pub name: String,
+}
+
+pub struct FileEntry {
+    pub id: i64,
+    pub abs_path: String,
+    pub rel_path: String,
+    pub file_name: String,
+    pub tags: Vec<TagEntry>,
+    pub last_modified: String,
+    pub created: String,
+}
 
 /// TagerManager - główna struktura zarządzająca systemem tagowania
 pub struct TagerManager {
@@ -268,6 +283,266 @@ impl TagerManager {
         }
 
         Ok(())
+    }
+
+     /// Przypisuje tag do pliku (lub tworzy nowy tag jeśli nie istnieje)
+    pub async fn assign_tag_to_file(
+        &self,
+        file_path: &Path,
+        tag_name: &str,
+    ) -> Result<(), DbError> {
+        if !self.is_initialized {
+            return Err(DbError::OperationFailed(
+                "TagerManager nie jest zainicjalizowany. Wywołaj init() przed użyciem".to_string(),
+            ));
+        }
+
+        // Znajdź plik po ścieżce
+        let files = self.db.get_files_by_path(file_path.to_path_buf()).await?;
+        if files.is_empty() {
+            return Err(DbError::OperationFailed(
+                format!("Plik '{}' nie istnieje w bazie danych", file_path.display())
+            ));
+        }
+
+        // Używamy pierwszego znalezionego pliku
+        let file = &files[0];
+        
+        // Dodaj tag do pliku (tworzy tag jeśli nie istnieje)
+        self.db.add_tag_by_name_to_file(file.id, tag_name).await?;
+        
+        Ok(())
+    }
+
+    /// Zmienia nazwę istniejącego tagu
+    pub async fn rename_tag(&self, old_name: &str, new_name: &str) -> Result<(), DbError> {
+        if !self.is_initialized {
+            return Err(DbError::OperationFailed(
+                "TagerManager nie jest zainicjalizowany".to_string(),
+            ));
+        }
+
+        // Sprawdź czy tag istnieje
+        let tag = self.db.get_tag_by_name(old_name).await?;
+        if tag.is_none() {
+            return Err(DbError::OperationFailed(
+                format!("Tag '{}' nie istnieje", old_name)
+            ));
+        }
+
+        let tag = tag.unwrap();
+        
+        // Sprawdź czy nowa nazwa nie jest już używana
+        if let Some(_) = self.db.get_tag_by_name(new_name).await? {
+            return Err(DbError::OperationFailed(
+                format!("Tag '{}' już istnieje", new_name)
+            ));
+        }
+
+        // Zmień nazwę
+        self.db.update_tag(tag.id, new_name).await?;
+        
+        Ok(())
+    }
+
+    /// Usuwa tag z pliku
+    pub async fn remove_tag_from_file(
+        &self,
+        file_path: &Path,
+        tag_name: &str,
+    ) -> Result<(), DbError> {
+        if !self.is_initialized {
+            return Err(DbError::OperationFailed(
+                "TagerManager nie jest zainicjalizowany".to_string(),
+            ));
+        }
+
+        // Znajdź plik po ścieżce
+        let files = self.db.get_files_by_path(file_path.to_path_buf()).await?;
+        if files.is_empty() {
+            return Err(DbError::OperationFailed(
+                format!("Plik '{}' nie istnieje w bazie danych", file_path.display())
+            ));
+        }
+
+        let file = &files[0];
+        
+        // Usuń tag z pliku
+        self.db.remove_tag_by_name_from_file(file.id, tag_name).await?;
+        
+        Ok(())
+    }
+
+    /// Całkowicie usuwa tag z systemu (wraz z powiązaniami)
+    pub async fn delete_tag_completely(&self, tag_name: &str) -> Result<(), DbError> {
+        if !self.is_initialized {
+            return Err(DbError::OperationFailed(
+                "TagerManager nie jest zainicjalizowany".to_string(),
+            ));
+        }
+
+        // Usuń tag (metoda w bazie usuwa też powiązania dzięki CASCADE)
+        self.db.delete_tag_by_name(tag_name).await?;
+        
+        Ok(())
+    }
+
+     /// Pobiera wszystkie tagi w systemie
+    pub async fn get_all_tags(&self) -> Result<Vec<TagEntry>, DbError> {
+        if !self.is_initialized {
+            return Err(DbError::OperationFailed(
+                "TagerManager nie jest zainicjalizowany".to_string(),
+            ));
+        }
+
+        let db_tags = self.db.get_all_tags().await?;
+        let tags: Vec<TagEntry> = db_tags
+            .into_iter()
+            .map(|t| TagEntry { id: t.id, name: t.name })
+            .collect();
+        
+        Ok(tags)
+    }
+
+     /// Pobiera listę plików z możliwością filtrowania po nazwie i tagach
+    pub async fn get_files(
+        &self,
+        name_filter: Option<String>,
+        tag_filters: Option<Vec<String>>,
+    ) -> Result<Vec<FileEntry>, DbError> {
+        if !self.is_initialized {
+            return Err(DbError::OperationFailed(
+                "TagerManager nie jest zainicjalizowany".to_string(),
+            ));
+        }
+
+        // Pobierz wszystkie pliki z bazy
+        let mut all_files = self.db.get_all_files(None, None).await?;
+        
+        // Filtruj po nazwie jeśli podano
+        if let Some(name_filter) = name_filter {
+            all_files.retain(|file| {
+                let file_name = file.path.file_name()
+                    .map(|n| n.to_string_lossy().to_lowercase())
+                    .unwrap_or_default();
+                file_name.contains(&name_filter.to_lowercase())
+            });
+        }
+        
+        // Filtruj po tagach jeśli podano
+        if let Some(tag_filters) = tag_filters {
+            if !tag_filters.is_empty() {
+                let filtered_files = self.get_files_by_tags(&tag_filters).await?;
+                
+                // Zachowaj tylko pliki, które są w obu listach
+                let filtered_ids: HashSet<i64> = filtered_files.iter().map(|f| f.id).collect();
+                all_files.retain(|file| filtered_ids.contains(&file.id));
+            }
+        }
+        
+        // Konwertuj DBFile na FileEntry
+        let mut file_entries = Vec::new();
+        for file in all_files {
+            // Pobierz tagi dla pliku
+            let db_tags = self.db.get_tags_for_file(file.id).await?;
+            let tags: Vec<TagEntry> = db_tags
+                .into_iter()
+                .map(|t| TagEntry { id: t.id, name: t.name })
+                .collect();
+            
+            let abs_path = self.root.join(&file.path);
+            
+            let file_entry = FileEntry {
+                id: file.id,
+                abs_path: abs_path.to_string_lossy().to_string(),
+                rel_path: file.path.to_string_lossy().to_string(),
+                file_name: file.path.file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default(),
+                tags,
+                last_modified: format!("{:?}", file.last_modified),
+                created: format!("{:?}", file.created),
+            };
+            
+            file_entries.push(file_entry);
+        }
+        
+        Ok(file_entries)
+    }
+
+    /// Pomocnicza metoda do pobierania plików z określonymi tagami
+    async fn get_files_by_tags(&self, tags: &[String]) -> Result<Vec<DBFile>, DbError> {
+        if tags.is_empty() {
+            return Ok(Vec::new());
+        }
+        
+        let mut result_files: Option<Vec<DBFile>> = None;
+        
+        for tag in tags {
+            let files_with_tag = self.db.get_files_with_tag_name(tag).await?;
+            
+            if result_files.is_none() {
+                result_files = Some(files_with_tag);
+            } else {
+                let current_files = result_files.take().unwrap();
+                let current_ids: HashSet<i64> = current_files.iter().map(|f| f.id).collect();
+                let new_ids: HashSet<i64> = files_with_tag.iter().map(|f| f.id).collect();
+                
+                // Przecięcie zbiorów - pliki które mają WSZYSTKIE wymagane tagi
+                let intersection_ids: HashSet<_> = current_ids.intersection(&new_ids).cloned().collect();
+                
+                let mut intersection_files = Vec::new();
+                for file in current_files {
+                    if intersection_ids.contains(&file.id) {
+                        intersection_files.push(file);
+                    }
+                }
+                
+                result_files = Some(intersection_files);
+            }
+        }
+        
+        Ok(result_files.unwrap_or_default())
+    }
+
+    /// Pobiera listę plików bez żadnych tagów
+    pub async fn get_files_without_tags(&self) -> Result<Vec<FileEntry>, DbError> {
+        if !self.is_initialized {
+            return Err(DbError::OperationFailed(
+                "TagerManager nie jest zainicjalizowany".to_string(),
+            ));
+        }
+
+        // Pobierz wszystkie pliki z bazy
+        let all_files = self.db.get_all_files(None, None).await?;
+        
+        let mut files_without_tags = Vec::new();
+        
+        for file in all_files {
+            // Pobierz tagi dla pliku
+            let tags = self.db.get_tags_for_file(file.id).await?;
+            
+            // Jeśli plik nie ma tagów, dodaj go do wyników
+            if tags.is_empty() {
+                let abs_path = self.root.join(&file.path);
+                
+                let file_entry = FileEntry {
+                    id: file.id,
+                    abs_path: abs_path.to_string_lossy().to_string(),
+                    rel_path: file.path.to_string_lossy().to_string(),
+                    file_name: file.path.file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_default(),
+                    tags: Vec::new(), // Puste tagi
+                    last_modified: format!("{:?}", file.last_modified),
+                    created: format!("{:?}", file.created),
+                };
+                
+                files_without_tags.push(file_entry);
+            }
+        }
+        
+        Ok(files_without_tags)
     }
 
     fn get_root_snapshot(&self) -> Result<HashMap<String, DBFile>, String> {
