@@ -54,9 +54,11 @@ export const useTagerStore = create<TagerState>((set) => ({
     try {
       const files = await api.initTagerManager(path);
       const status = await api.getManagerStatus();
+      const tags = await api.getAllTags();
 
       set({
         files,
+        tags,
         status,
         rootPath: path,
         selectedFileId: null, // NOWY ROOT = brak selekcji
