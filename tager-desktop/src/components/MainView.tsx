@@ -18,7 +18,7 @@ import FileCard from "./FileCard";
 import { useTagerStore } from "../store";
 
 interface MainViewProps {
-  directoryPath: string;
+  directoryPath: string | null;
 }
 
 export default function MainView({ directoryPath }: MainViewProps) {
@@ -30,6 +30,7 @@ export default function MainView({ directoryPath }: MainViewProps) {
   const {files, init: tager_init, loading: files_loading, select, tags} = useTagerStore();
 
   async function loadFiles() {
+    if (!directoryPath) return;
     try {
       setError(null);
 
@@ -85,6 +86,12 @@ export default function MainView({ directoryPath }: MainViewProps) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
+
+  if (!directoryPath) {
+    return (
+      <div></div>
+    )
+  }
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3, width: "100%", height: "100%" }}>
       {/* Nagłówek z informacjami o katalogu */}

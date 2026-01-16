@@ -10,6 +10,12 @@ import {
   TextField,
   Autocomplete,
   Popover,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from "@mui/material";
 import {
   Folder as FolderIcon,
@@ -26,10 +32,10 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { openPath } from '@tauri-apps/plugin-opener';
 import { useTagerStore } from "../store";
 import type { EntryType } from "../types";
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 interface SidePanelProps {
-  directoryPath: string;
+  directoryPath: string | null;
   onDirectoryChange: (path: string) => void;
   filesCount: number;
   tagsCount: number;
@@ -81,9 +87,23 @@ export default function SidePanel({
   const [isAddingTag, setIsAddingTag] = useState(false);
   const [newTagName, setNewTagName] = useState('');
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+  const [confirmationDialogOpen, setConfirmationDialogOpen] = useState(false);
+  const [selectedTempPath, setSelectedTempPath] = useState<string | null>(null);
+  const [showInitialDialog, setShowInitialDialog] = useState(false);
   const addButtonRef = useRef<HTMLDivElement>(null);
   
   const selectedFile = selectedFileId !== null && files.find(e => e.id === selectedFileId);
+
+  // Efekt do pokazania dialogu początkowego tylko raz przy starcie
+  useEffect(() => {
+    if (!directoryPath && !showInitialDialog) {
+      // Opóźnienie, aby komponent się zamontował
+      const timer = setTimeout(() => {
+        setShowInitialDialog(true);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [directoryPath, showInitialDialog]);
 
   const handleFolderPicker = async () => {
     try {
@@ -95,11 +115,32 @@ export default function SidePanel({
 
       if (selected !== null) {
         const path = Array.isArray(selected) ? selected[0] : selected;
-        onDirectoryChange(path);
+        // Zapisujemy tymczasową ścieżkę i pokazujemy dialog potwierdzenia
+        setSelectedTempPath(path);
+        setConfirmationDialogOpen(true);
+        // Jeśli był otwarty dialog początkowy, zamykamy go
+        setShowInitialDialog(false);
       }
     } catch (error) {
       console.error('Błąd przy wyborze folderu:', error);
     }
+  };
+
+  const handleConfirmDirectory = () => {
+    if (selectedTempPath) {
+      onDirectoryChange(selectedTempPath);
+      setConfirmationDialogOpen(false);
+      setSelectedTempPath(null);
+    }
+  };
+
+  const handleCancelDirectory = () => {
+    setConfirmationDialogOpen(false);
+    setSelectedTempPath(null);
+  };
+
+  const handleCloseInitialDialog = () => {
+    setShowInitialDialog(false);
   };
 
   const handleOpenFile = async (filePath: string) => {
@@ -144,6 +185,93 @@ export default function SidePanel({
     if (!selectedFile)
       return
     removeTag(selectedFile.rel_path, name);
+  }
+
+  // Dialog początkowy gdy directoryPath jest null
+  if (!directoryPath) {
+    return (
+      <>
+        <Dialog
+          open={showInitialDialog}
+          onClose={handleCloseInitialDialog}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>Witaj w Tager</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              Aby rozpocząć pracę z aplikacją, wybierz katalog zawierający pliki do oznaczania tagami.
+            </DialogContentText>
+            <Box sx={{ 
+              display: 'flex', 
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              my: 3,
+            }}>
+              <FolderIcon 
+                sx={{ 
+                  fontSize: 64, 
+                  color: 'primary.main',
+                  mb: 2,
+                }} 
+              />
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseInitialDialog} color="inherit">
+              Zamknij
+            </Button>
+            <Button 
+              onClick={handleFolderPicker} 
+              variant="contained" 
+              color="primary" 
+              autoFocus
+              startIcon={<FolderIcon />}
+            >
+              Wybierz katalog
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Dialog potwierdzenia wyboru katalogu */}
+        <Dialog
+          open={confirmationDialogOpen}
+          onClose={handleCancelDirectory}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>Potwierdzenie wyboru katalogu</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              Czy na pewno chcesz załadować następujący katalog?
+            </DialogContentText>
+            <Box sx={{ 
+              mt: 2, 
+              p: 2, 
+              bgcolor: 'action.hover', 
+              borderRadius: 1,
+              wordBreak: 'break-all',
+              fontFamily: 'monospace',
+              fontSize: '0.875rem',
+            }}>
+              {selectedTempPath}
+            </Box>
+            <DialogContentText sx={{ mt: 2 }}>
+              Wszystkie obecnie załadowane dane zostaną zastąpione nowymi.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCancelDirectory} color="inherit">
+              Anuluj
+            </Button>
+            <Button onClick={handleConfirmDirectory} variant="contained" color="primary" autoFocus>
+              Załaduj katalog
+            </Button>
+          </DialogActions>
+        </Dialog>
+      </>
+    );
   }
 
   return (
@@ -392,6 +520,43 @@ export default function SidePanel({
           )}
         </Box>
       </Box>
+
+      {/* Dialog potwierdzenia wyboru katalogu */}
+      <Dialog
+        open={confirmationDialogOpen}
+        onClose={handleCancelDirectory}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Potwierdzenie wyboru katalogu</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Czy na pewno chcesz załadować następujący katalog?
+          </DialogContentText>
+          <Box sx={{ 
+            mt: 2, 
+            p: 2, 
+            bgcolor: 'action.hover', 
+            borderRadius: 1,
+            wordBreak: 'break-all',
+            fontFamily: 'monospace',
+            fontSize: '0.875rem',
+          }}>
+            {selectedTempPath}
+          </Box>
+          <DialogContentText sx={{ mt: 2 }}>
+            Wszystkie obecnie załadowane dane zostaną zastąpione nowymi.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCancelDirectory} color="inherit">
+            Anuluj
+          </Button>
+          <Button onClick={handleConfirmDirectory} variant="contained" color="primary" autoFocus>
+            Załaduj katalog
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Popover dla dodawania nowego tagu */}
       <Popover

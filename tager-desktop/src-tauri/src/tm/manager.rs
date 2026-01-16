@@ -1,7 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
     io::{self, Read}, // Dodane
-    os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
 };
 
@@ -594,7 +593,7 @@ impl TagerManager {
                 DBFile {
                     id: 0,
                     path: PathBuf::from(rel_path_str),
-                    size: metadata.size(),
+                    size: metadata.len(),
                     content_hash: hash,
                     last_modified,
                     last_accessed,

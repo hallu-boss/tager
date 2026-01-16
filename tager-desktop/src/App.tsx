@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Box,
   Drawer,
@@ -12,14 +12,25 @@ import {
   Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import MainView from './components/MainView';
-import { MOCK_DIRECTORY_PATH } from './types';
+//import { MOCK_DIRECTORY_PATH } from './types';
 import SidePanel from './components/SidePanel';
 
 const drawerWidth = 280;
+const DIRECTORY_PATH_KEY = 'directoryPath';
 
 function App() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [directoryPath, setDirectoryPath] = useState(MOCK_DIRECTORY_PATH);
+  const [directoryPath, setDirectoryPath] = useState<string | null>(() => {
+    return localStorage.getItem(DIRECTORY_PATH_KEY);
+  });
+
+  useEffect(() => {
+    if (directoryPath === null) {
+      localStorage.removeItem(DIRECTORY_PATH_KEY);
+    } else {
+      localStorage.setItem(DIRECTORY_PATH_KEY, directoryPath);
+    }
+  }, [directoryPath]);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
