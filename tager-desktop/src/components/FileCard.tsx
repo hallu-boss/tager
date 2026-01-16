@@ -47,13 +47,14 @@ interface FileCardProps {
   path: string
   tags: string[];
   size?: string;
+  thumbnail: string | undefined;
   modified?: string;
   onAddTag?: () => void;
   onCardClick?: () => void;
   type: EntryType;
 }
 
-export default function FileCard({ id, name, path, tags, type, onCardClick }: FileCardProps) {
+export default function FileCard({ id, name, path, tags, type, onCardClick, thumbnail }: FileCardProps) {
   const [loadError, setLoadError] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -72,6 +73,10 @@ export default function FileCard({ id, name, path, tags, type, onCardClick }: Fi
    useEffect(() => {
     const loadThumbnail = async () => {
       if (!isImage || loadError) return;
+      if (thumbnail) {
+        setImageUrl(thumbnail);
+        return;
+      }
       
       setIsLoading(true);
       try {

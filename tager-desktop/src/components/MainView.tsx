@@ -10,6 +10,8 @@ import {
   CircularProgress,
   Alert,
   Paper,
+  FormControlLabel,
+  Checkbox,
 } from "@mui/material";
 import { FilterList as FilterListIcon } from "@mui/icons-material";
 import FileCard from "./FileCard";
@@ -22,10 +24,10 @@ interface MainViewProps {
 export default function MainView({ directoryPath }: MainViewProps) {
   const [query, setQuery] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [allTags, setAllTags] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [inboxFilter, setInboxFilter] = useState(false);
 
-  const {files, init: tager_init, loading: files_loading, select} = useTagerStore();
+  const {files, init: tager_init, loading: files_loading, select, tags} = useTagerStore();
 
   async function loadFiles() {
     try {
@@ -40,7 +42,6 @@ export default function MainView({ directoryPath }: MainViewProps) {
         console.error('Błąd inicjalizacji:', err);
       }
 
-      setAllTags([]);
     } catch (err) {
       const errMsg = `Błąd przy pobieraniu plików ${err}`
       setError(errMsg)
@@ -63,11 +64,17 @@ export default function MainView({ directoryPath }: MainViewProps) {
       file.file_name.toLowerCase().includes(query.toLowerCase()) ||
       file.tags.some((tag) => tag.name.toLowerCase().includes(query.toLowerCase()));
 
-    // const matchesTags =
-    //   selectedTags.length === 0 ||
-    //   selectedTags.every((tag) => file.tags.includes(tag));
+    // Jeśli inboxFilter jest włączony, pokazuj tylko pliki bez tagów
+    if (inboxFilter) {
+      return matchesSearch && file.tags.length === 0;
+    }
 
-    return matchesSearch;
+    // Normalna logika filtrowania tagów
+    const matchesTags =
+      selectedTags.length === 0 ||
+      selectedTags.every((tag) => file.tags.map(t => t.name).includes(tag));
+
+    return matchesSearch && matchesTags;
   });
 
   const formatFileSize = (bytes: number) => {
@@ -95,7 +102,7 @@ export default function MainView({ directoryPath }: MainViewProps) {
             variant="outlined"
           />
           <Chip
-            label={`${allTags.length} tagów`}
+            label={`${tags.length} tagów`}
             size="small"
             variant="outlined"
           />
@@ -119,7 +126,23 @@ export default function MainView({ directoryPath }: MainViewProps) {
           fullWidth
         />
 
-        <Box
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={inboxFilter}
+              onChange={(e) => {
+                setInboxFilter(e.target.checked);
+                // Jeśli włączamy inbox, czyścimy zaznaczone tagi
+                if (e.target.checked) {
+                  setSelectedTags([]);
+                }
+              }}
+            />
+          }
+          label="Inbox"
+        />
+
+        {!inboxFilter && (<Box
           sx={{
             display: "flex",
             alignItems: "center",
@@ -127,19 +150,20 @@ export default function MainView({ directoryPath }: MainViewProps) {
             flexWrap: "wrap",
           }}
         >
+          
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <FilterListIcon fontSize="small" />
             <Typography variant="body2">Filtry tagów:</Typography>
           </Box>
 
-          {allTags.map((tag) => (
+          {tags.map((tag) => (
             <Chip
-              key={tag}
-              label={tag}
+              key={tag.id}
+              label={tag.name}
               clickable
-              color={selectedTags.includes(tag) ? "primary" : "default"}
-              variant={selectedTags.includes(tag) ? "filled" : "outlined"}
-              onClick={() => handleTagClick(tag)}
+              color={selectedTags.includes(tag.name) ? "primary" : "default"}
+              variant={selectedTags.includes(tag.name) ? "filled" : "outlined"}
+              onClick={() => handleTagClick(tag.name)}
               size="small"
             />
           ))}
@@ -153,7 +177,7 @@ export default function MainView({ directoryPath }: MainViewProps) {
               Wyczyść filtry
             </Button>
           )}
-        </Box>
+        </Box>)}
       </Box>
 
       {/* Komunikat ładowania */}
@@ -196,6 +220,7 @@ export default function MainView({ directoryPath }: MainViewProps) {
                   size={formatFileSize(file.size)}
                   modified={file.last_modified}
                   type={file.type}
+                  thumbnail={file.thumbnail}
                 />
               </Grid>
             ))}

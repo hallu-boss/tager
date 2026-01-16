@@ -76,8 +76,6 @@ const formatDate = (dateString: string) => {
 export default function SidePanel({
   directoryPath,
   onDirectoryChange,
-  filesCount,
-  tagsCount,
 }: SidePanelProps) {
   const { files, selectedFileId, tags, assignTag, removeTag } = useTagerStore();
   const [isAddingTag, setIsAddingTag] = useState(false);
@@ -365,13 +363,13 @@ export default function SidePanel({
               <Stack direction="row" spacing={1} sx={{ mb: 3 }}>
                 <Chip
                   icon={<InsertDriveFileIcon />}
-                  label={`${filesCount} plików`}
+                  label={`${files.length} files`}
                   variant="outlined"
                   size="small"
                 />
                 <Chip
                   icon={<TagIcon />}
-                  label={`${tagsCount} tagów`}
+                  label={`${tags.length} tags`}
                   variant="outlined"
                   size="small"
                 />
