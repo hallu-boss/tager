@@ -29,7 +29,7 @@ import {
   Add as AddIcon,
 } from '@mui/icons-material';
 import { open } from '@tauri-apps/plugin-dialog';
-import { openPath } from '@tauri-apps/plugin-opener';
+import { openPath, revealItemInDir } from '@tauri-apps/plugin-opener';
 import { useTagerStore } from "../store";
 import type { EntryType } from "../types";
 import { useState, useRef, useEffect } from 'react';
@@ -148,6 +148,14 @@ export default function SidePanel({
       await openPath(filePath);
     } catch (err) {
       console.log('open file error: ', err);
+    }
+  };
+
+  const handleRevealFile = async (filePath: string) => {
+    try {
+      await revealItemInDir(filePath);
+    } catch (err) {
+      console.log('reveal file error: ', err);
     }
   };
 
@@ -425,6 +433,30 @@ export default function SidePanel({
                       }}
                       title={`Kliknij, aby otworzyć: ${selectedFile.abs_path}`}
                       onClick={() => handleOpenFile(selectedFile.abs_path)}
+                    >
+                      {selectedFile.abs_path}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Katalog:
+                    </Typography>
+                    <Typography 
+                      variant="body2" 
+                      sx={{ 
+                        maxWidth: 150,
+                        textOverflow: 'ellipsis',
+                        overflow: 'hidden',
+                        whiteSpace: 'nowrap',
+                        fontFamily: 'monospace',
+                        fontSize: '0.8rem',
+                        '&:hover': {
+                          textDecoration: 'underline',
+                          cursor: 'pointer',
+                        }
+                      }}
+                      title={`Kliknij, aby otworzyć: ${selectedFile.abs_path}`}
+                      onClick={() => handleRevealFile(selectedFile.abs_path)}
                     >
                       {selectedFile.abs_path}
                     </Typography>

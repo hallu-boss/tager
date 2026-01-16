@@ -147,6 +147,9 @@ export default function MainView({ directoryPath }: MainViewProps) {
             />
           }
           label="Inbox"
+          sx={{
+            color: "black"
+          }}
         />
 
         {!inboxFilter && (<Box
@@ -159,8 +162,8 @@ export default function MainView({ directoryPath }: MainViewProps) {
         >
           
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <FilterListIcon fontSize="small" />
-            <Typography variant="body2">Filtry tagów:</Typography>
+            <FilterListIcon fontSize="small" sx={{color: "black"}} />
+            <Typography variant="body2" color="black">Filtry tagów:</Typography>
           </Box>
 
           {tags.map((tag) => (

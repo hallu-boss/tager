@@ -23,6 +23,7 @@ type TagerState = {
 
   // UI / control
   loading: boolean;
+  isSyncing: boolean;
   error: string | null;
   rootPath: string | null;
 
@@ -36,6 +37,7 @@ type TagerState = {
   assignTag: (filePath: string, tagName: string) => Promise<void>;
   removeTag: (filePath: string, tagName: string) => Promise<void>;
   disconnect: () => Promise<void>;
+  sync: () => Promise<void>;
 };
 
 export const useTagerStore = create<TagerState>((set) => ({
@@ -48,6 +50,7 @@ export const useTagerStore = create<TagerState>((set) => ({
   loading: false,
   error: null,
   rootPath: null,
+  isSyncing: false,
 
   init: async (path) => {
     set({ loading: true, error: null });
@@ -68,6 +71,20 @@ export const useTagerStore = create<TagerState>((set) => ({
       set({ error: String(e) });
     } finally {
       set({ loading: false });
+    }
+  },
+
+  sync: async () => {
+    set({ isSyncing: true });
+    try {
+      const files = await api.syncAndGetFiles();
+      const tags = await api.getAllTags();
+
+      set({ files, tags });
+    } catch (e) {
+      set({ error: String(e) });
+    } finally {
+      set({ isSyncing: false });
     }
   },
 
@@ -142,7 +159,7 @@ export const useTagerStore = create<TagerState>((set) => ({
         });
 
         return {
-          files: mergedFiles
+          files: mergedFiles,
         }
       }
       );
@@ -179,6 +196,9 @@ export const useTagerStore = create<TagerState>((set) => ({
         }
       }
       );
+
+      const tags = await api.getAllTags();
+      set({ tags });
     } catch (e) {
       set({ error: String(e) });
     }

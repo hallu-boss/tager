@@ -14,6 +14,7 @@ import {
 import MainView from './components/MainView';
 //import { MOCK_DIRECTORY_PATH } from './types';
 import SidePanel from './components/SidePanel';
+import { useTagerStore } from './store';
 
 const drawerWidth = 280;
 const DIRECTORY_PATH_KEY = 'directoryPath';
@@ -23,6 +24,8 @@ function App() {
   const [directoryPath, setDirectoryPath] = useState<string | null>(() => {
     return localStorage.getItem(DIRECTORY_PATH_KEY);
   });
+
+  const {sync, isSyncing} = useTagerStore();
 
   useEffect(() => {
     if (directoryPath === null) {
@@ -44,6 +47,10 @@ function App() {
       tagsCount={10}
     />
   )
+
+  async function handleRefreshIconButton(): Promise<void> {
+    await sync();
+  }
 
   return (
     <Box sx={{ display: 'flex', height: '100vh', width: '100vw' }}>
@@ -67,7 +74,7 @@ function App() {
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             Tager
           </Typography>
-          <IconButton color="inherit">
+          <IconButton color="inherit" onClick={() => handleRefreshIconButton()} disabled={isSyncing}>
             <RefreshIcon />
           </IconButton>
         </Toolbar>
