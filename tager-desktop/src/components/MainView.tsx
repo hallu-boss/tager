@@ -14,6 +14,7 @@ import {
   Checkbox,
 } from "@mui/material";
 import { FilterList as FilterListIcon } from "@mui/icons-material";
+import { watch, BaseDirectory, type WatchEvent } from '@tauri-apps/plugin-fs';
 import FileCard from "./FileCard";
 import { useTagerStore } from "../store";
 
@@ -28,6 +29,11 @@ export default function MainView({ directoryPath }: MainViewProps) {
   const [inboxFilter, setInboxFilter] = useState(false);
 
   const {files, init: tager_init, loading: files_loading, select, tags} = useTagerStore();
+
+  const watchTest = async () => {
+    await watch("/home/hallu/Documents", (event) => console.log("testowy.txt event", event), { delayMs: 10000 });
+  }
+  watchTest();
 
   async function loadFiles() {
     if (!directoryPath) return;

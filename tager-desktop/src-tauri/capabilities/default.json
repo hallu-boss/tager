@@ -14,6 +14,14 @@
         "**"
       ]
     },
+    {
+      "identifier": "fs:allow-app-read",
+      "allow": ["**"]
+    },
+    {
+      "identifier": "fs:allow-exists",
+      "allow": [{ "path": "**" }]
+    },
     "dialog:default",
     "opener:default",
     {
