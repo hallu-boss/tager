@@ -146,8 +146,8 @@ impl Database {
         .await
         .map_err(DbError::Sql)?;
 
-        let id: i64 = row.get("id");
-        print!("utworzono pliczek {} {} {}\n", id, path_str, size);
+        //let id: i64 = row.get("id");
+        // print!("utworzono pliczek {} {} {}\n", id, path_str, size);
 
         Ok(row.get::<i64, _>("id"))
     }

@@ -49,12 +49,13 @@ interface FileCardProps {
   size?: string;
   thumbnail: string | undefined;
   modified?: string;
+  isSelected: boolean;
   onAddTag?: () => void;
   onCardClick?: () => void;
   type: EntryType;
 }
 
-export default function FileCard({ id, name, path, tags, type, onCardClick, thumbnail }: FileCardProps) {
+export default function FileCard({ id, name, path, tags, type, isSelected, onCardClick, thumbnail }: FileCardProps) {
   const [loadError, setLoadError] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -108,7 +109,16 @@ export default function FileCard({ id, name, path, tags, type, onCardClick, thum
   const shouldShowThumbnail = isImage && imageUrl && !loadError && !isLoading;
 
   return (
-    <Card sx={{ borderRadius: 2, boxShadow: 1, '&:hover': { boxShadow: 4 } }}>
+    <Card 
+      sx={{
+        borderRadius: 2,
+        boxShadow: 1,
+        border: isSelected ? "1px solid" : "1px solid transparent",
+        borderColor: isSelected ? "primary.main" : "transparent",
+        transition: "border-color 0.2s ease, box-shadow 0.2s ease",
+        "&:hover": { boxShadow: 4 },
+      }}
+    >
       <CardActionArea onClick={onCardClick}>
         {/* --- Miniatura lub ikona --- */}
         <Box

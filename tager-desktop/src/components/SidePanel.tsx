@@ -353,15 +353,6 @@ export default function SidePanel({
                 </Box>
                 
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography 
-                    variant="body2" 
-                    sx={{ 
-                      fontWeight: 'medium',
-                      mb: 0.5,
-                    }}
-                  >
-                    {selectedFile.file_name}
-                  </Typography>
                   
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
                     <Typography 
@@ -377,7 +368,7 @@ export default function SidePanel({
                       {formatFileSize(selectedFile.size)}
                     </Typography>
                     
-                    {selectedFile.tags.length > 0 && (
+                    {/* {selectedFile.tags.length > 0 && (
                       <Badge
                         badgeContent={selectedFile.tags.length}
                         color="primary"
@@ -389,20 +380,8 @@ export default function SidePanel({
                           },
                         }}
                       />
-                    )}
+                    )} */}
                   </Box>
-                  
-                  <Typography 
-                    variant="caption" 
-                    color="text.secondary"
-                    sx={{ 
-                      display: 'block',
-                      mt: 0.5,
-                      fontSize: '0.75rem',
-                    }}
-                  >
-                    Zmodyfikowano: {formatDate(selectedFile.last_modified)}
-                  </Typography>
                 </Box>
               </Stack>
 
@@ -432,14 +411,14 @@ export default function SidePanel({
                         }
                       }}
                       title={`Kliknij, aby otworzyć: ${selectedFile.abs_path}`}
-                      onClick={() => handleOpenFile(selectedFile.abs_path)}
+                      onClick={() => handleRevealFile(selectedFile.abs_path)}
                     >
                       {selectedFile.abs_path}
                     </Typography>
                   </Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                     <Typography variant="body2" color="text.secondary">
-                      Katalog:
+                      Plik:
                     </Typography>
                     <Typography 
                       variant="body2" 
@@ -455,23 +434,14 @@ export default function SidePanel({
                           cursor: 'pointer',
                         }
                       }}
-                      title={`Kliknij, aby otworzyć: ${selectedFile.abs_path}`}
-                      onClick={() => handleRevealFile(selectedFile.abs_path)}
+                      title={`Kliknij, aby otworzyć: ${selectedFile.file_name}`}
+                      onClick={() => handleOpenFile(selectedFile.abs_path)}
                     >
-                      {selectedFile.abs_path}
+                      {selectedFile.file_name}
                     </Typography>
                   </Box>
                   
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="body2" color="text.secondary">
-                      Typ:
-                    </Typography>
-                    <Chip 
-                      label={selectedFile.type} 
-                      size="small" 
-                      sx={{ textTransform: 'capitalize' }}
-                    />
-                  </Box>
+        
                   
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                     <Typography variant="body2" color="text.secondary">
@@ -517,23 +487,6 @@ export default function SidePanel({
           ) : (
             // Widok domyślny (statystyki katalogu)
             <>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                Statystyki katalogu
-              </Typography>
-              <Stack direction="row" spacing={1} sx={{ mb: 3 }}>
-                <Chip
-                  icon={<InsertDriveFileIcon />}
-                  label={`${files.length} files`}
-                  variant="outlined"
-                  size="small"
-                />
-                <Chip
-                  icon={<TagIcon />}
-                  label={`${tags.length} tags`}
-                  variant="outlined"
-                  size="small"
-                />
-              </Stack>
               
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
                 Informacja

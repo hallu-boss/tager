@@ -67,6 +67,15 @@ async fn main() {
 
     println!(" ilość plików w bd {}", manager.db().get_all_files(None, None).await.unwrap().len());
 
+    // ===== 4. full_sync() + pomiar czasu =====
+    let sync_start = Instant::now();
+    manager.full_sync().await.expect("Błąd full_sync()");
+    let sync_time = sync_start.elapsed();
+
+    println!("⏱️ full_sync() zajęło: {:.3?}", sync_time);
+
+    // println!(" ilość plików w bd {}", manager.db().get_all_files(None, None).await.unwrap().len());
+
     let sync_start = Instant::now();
     manager.sync().await.expect("Błąd sync()");
     let sync_time = sync_start.elapsed();

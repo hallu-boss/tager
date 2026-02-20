@@ -102,7 +102,7 @@ export const useTagerStore = create<TagerState>((set) => ({
       const files = await api.syncAndGetFiles();
       set((state) => ({
         files,
-        selectedFileId: ensureSelectionValid(files, state.selectedFileId),
+        selectedFileId: null,
       }));
     } catch (e) {
       set({ error: String(e) });

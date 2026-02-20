@@ -28,7 +28,7 @@ export default function MainView({ directoryPath }: MainViewProps) {
   const [error, setError] = useState<string | null>(null);
   const [inboxFilter, setInboxFilter] = useState(false);
 
-  const {files, init: tager_init, loading: files_loading, select, tags} = useTagerStore();
+  const {files, init: tager_init, loading: files_loading, select, selectedFileId, tags} = useTagerStore();
 
   const watchTest = async () => {
     await watch("/home/hallu/Documents", (event) => console.log("testowy.txt event", event), { delayMs: 10000 });
@@ -235,6 +235,7 @@ export default function MainView({ directoryPath }: MainViewProps) {
                   onCardClick={() => select(file.id)}
                   size={formatFileSize(file.size)}
                   modified={file.last_modified}
+                  isSelected={file.id === selectedFileId}
                   type={file.type}
                   thumbnail={file.thumbnail}
                 />
